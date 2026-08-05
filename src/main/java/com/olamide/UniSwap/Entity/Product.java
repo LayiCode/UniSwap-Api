@@ -3,7 +3,9 @@ package com.olamide.UniSwap.Entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 @Entity
 @Table(name = "products")
@@ -18,23 +20,34 @@ public class Product {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    // Optimistic lock. On every UPDATE Hibernate bumps this column; a
+    // concurrent write that is based on a stale row fails with
+    // ObjectOptimisticLockingFailureException instead of silently
+    // overwriting the other transaction's change (e.g. two "mark sold"
+    // requests racing each other).
+    @Version
+    private Long version;
+
+    @Column(nullable = false, length = 120)
     private String title;
 
     @Column(columnDefinition = "TEXT")
     private String description;
 
-    @Column(nullable = false)
-    private Double price;
+    // DECIMAL, not DOUBLE: binary floats can't represent money exactly
+    // (0.1 + 0.2 != 0.3), so prices use fixed-point arithmetic.
+    @Column(nullable = false, precision = 12, scale = 2)
+    private BigDecimal price;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 50)
     private String category; // e.g., "Electronics", "Books", "Furniture"
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 50)
     private String itemCondition; // e.g., "Brand New", "Neatly Used"
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private String status; // "AVAILABLE" or "SOLD"
+    private ProductStatus status; // "AVAILABLE" or "SOLD"
 
     @Column(name = "image_url")
     private String imageUrl;
@@ -48,9 +61,11 @@ public class Product {
 
     @PrePersist
     protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
+        // Store wall-clock time in UTC so timestamps don't drift with the
+        // JVM's local zone; the JDBC connection also negotiates UTC.
+        this.createdAt = LocalDateTime.now(ZoneOffset.UTC);
         if (this.status == null) {
-            this.status = "AVAILABLE"; // Default status when created
+            this.status = ProductStatus.AVAILABLE; // Default status when created
         }
     }
 }

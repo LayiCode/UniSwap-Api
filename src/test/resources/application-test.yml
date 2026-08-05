@@ -1,0 +1,28 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:uniswap_test;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop   # fresh schema for every test run, no leftover state
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 5MB
+
+app:
+  upload:
+    dir: test-uploads
+    base-url: http://localhost:8080/uploads
+
+jwt:
+  secret: test-only-secret-key-not-used-anywhere-real-0000000000000000
+  expiration-ms: 3600000

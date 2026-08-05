@@ -4,7 +4,6 @@ import com.olamide.UniSwap.Config.UserPrincipal;
 import com.olamide.UniSwap.Dto.PageResponseDTO;
 import com.olamide.UniSwap.Dto.ProductDTO;
 import com.olamide.UniSwap.Entity.Product;
-import com.olamide.UniSwap.Service.FileStorageService;
 import com.olamide.UniSwap.Service.ProductService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/products")
@@ -26,12 +26,11 @@ public class ProductController {
     private static final int MAX_PAGE_SIZE = 50;
 
     private final ProductService productService;
-    private final FileStorageService fileStorageService;
 
     // GET /api/products                          -> all available listings, page 0, size 10, newest first
     // GET /api/products?page=1&size=20            -> page 1, 20 per page
     // GET /api/products?category=Electronics      -> available listings in category X
-    // GET /api/products?search=laptop             -> title search (any status)
+    // GET /api/products?search=laptop             -> available listings whose title contains "laptop"
     @GetMapping
     public ResponseEntity<PageResponseDTO<ProductDTO>> getAll(
             @RequestParam(required = false) String category,
@@ -67,7 +66,7 @@ public class ProductController {
             @RequestParam(defaultValue = "10") int size
     ) {
         Pageable pageable = buildPageable(page, size);
-        Page<Product> products = productService.getBySeller(principal.getId(), pageable);
+        Page<Product> products = productService.getBySeller(currentUserId(principal), pageable);
         return ResponseEntity.ok(toPageResponse(products));
     }
 
@@ -76,7 +75,7 @@ public class ProductController {
             @Valid @RequestBody ProductDTO dto,
             @AuthenticationPrincipal UserPrincipal principal
     ) {
-        Product created = productService.create(dto, principal.getId());
+        Product created = productService.create(dto, currentUserId(principal));
         return ResponseEntity.status(HttpStatus.CREATED).body(ProductDTO.fromEntity(created));
     }
 
@@ -86,20 +85,20 @@ public class ProductController {
             @Valid @RequestBody ProductDTO dto,
             @AuthenticationPrincipal UserPrincipal principal
     ) {
-        Product updated = productService.update(id, dto, principal.getId());
+        Product updated = productService.update(id, dto, currentUserId(principal));
         return ResponseEntity.ok(ProductDTO.fromEntity(updated));
     }
 
     // multipart/form-data, not JSON — the field name must be "file".
-    // Seller-only: ownership is enforced inside productService.updateImage.
+    // Seller-only: ownership is verified inside ProductService BEFORE the
+    // bytes are written to disk, so a rejected upload never orphans a file.
     @PostMapping("/{id}/image")
     public ResponseEntity<ProductDTO> uploadImage(
             @PathVariable Long id,
             @RequestParam("file") MultipartFile file,
             @AuthenticationPrincipal UserPrincipal principal
     ) {
-        String imageUrl = fileStorageService.store(file);
-        Product updated = productService.updateImage(id, imageUrl, principal.getId());
+        Product updated = productService.uploadImage(id, file, currentUserId(principal));
         return ResponseEntity.ok(ProductDTO.fromEntity(updated));
     }
 
@@ -108,7 +107,7 @@ public class ProductController {
             @PathVariable Long id,
             @AuthenticationPrincipal UserPrincipal principal
     ) {
-        Product sold = productService.markAsSold(id, principal.getId());
+        Product sold = productService.markAsSold(id, currentUserId(principal));
         return ResponseEntity.ok(ProductDTO.fromEntity(sold));
     }
 
@@ -117,8 +116,18 @@ public class ProductController {
             @PathVariable Long id,
             @AuthenticationPrincipal UserPrincipal principal
     ) {
-        productService.delete(id, principal.getId());
+        productService.delete(id, currentUserId(principal));
         return ResponseEntity.noContent().build();
+    }
+
+    // Defense-in-depth: a null principal means the security matcher somehow
+    // let an unauthenticated request through. Fail with a clean 401 instead
+    // of an NPE that would surface as a confusing 500.
+    private Long currentUserId(UserPrincipal principal) {
+        if (principal == null || principal.getId() == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required");
+        }
+        return principal.getId();
     }
 
     // Caps page size server-side — a client sending ?size=100000 can't force

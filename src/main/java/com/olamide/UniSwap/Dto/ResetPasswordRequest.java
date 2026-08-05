@@ -1,7 +1,5 @@
 package com.olamide.UniSwap.Dto;
 
-
-
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -17,26 +15,18 @@ import lombok.Setter;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class RegisterRequest {
-
-    @NotBlank(message = "Username is required")
-    @Size(min = 3, max = 30, message = "Username must be between 3 and 30 characters")
-    private String username;
+public class ResetPasswordRequest {
 
     @NotBlank(message = "Email is required")
     @Email(message = "Email must be a valid email address")
-    // Uncomment to restrict signups to LAUTECH student emails only:
-    // @Pattern(regexp = "^[A-Za-z0-9._%+-]+@student\\.lautech\\.edu\\.ng$",
-    //         message = "Email must be a valid LAUTECH student email")
     private String email;
 
-    @NotBlank(message = "Password is required")
+    @NotBlank(message = "Reset code is required")
+    private String code;
+
+    @NotBlank(message = "New password is required")
     @Size(min = 8, max = 64, message = "Password must be between 8 and 64 characters")
     @Pattern(regexp = "^(?=.*[A-Za-z])(?=.*\\d).+$",
             message = "Password must contain at least one letter and one number")
-    private String password;
-
-    @NotBlank(message = "Phone number is required")
-    @Pattern(regexp = "^\\+?[0-9]{10,14}$", message = "Phone number must be a valid number")
-    private String phoneNumber;
+    private String newPassword;
 }

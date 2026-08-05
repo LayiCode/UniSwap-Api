@@ -2,6 +2,7 @@ package com.olamide.UniSwap.Service;
 
 import com.olamide.UniSwap.Dto.ProductDTO;
 import com.olamide.UniSwap.Entity.Product;
+import com.olamide.UniSwap.Entity.ProductStatus;
 import com.olamide.UniSwap.Entity.User;
 import com.olamide.UniSwap.Repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
@@ -9,19 +10,31 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
+
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
 public class ProductService {
 
-    private static final String AVAILABLE = "AVAILABLE";
-    private static final String SOLD = "SOLD";
+    // Server-side vocabularies for the free-form-ish category/condition
+    // strings. Keeps typo'd categories from silently returning empty feeds.
+    private static final Set<String> ALLOWED_CATEGORIES = Set.of(
+            "Electronics", "Phones & Tablets", "Books", "Furniture", "Clothing",
+            "Shoes", "Vehicles", "Sports", "Beauty", "Others");
+    private static final Set<String> ALLOWED_CONDITIONS = Set.of(
+            "Brand New", "Neatly Used", "Fairly Used", "Refurbished", "For Parts");
 
     private final ProductRepository productRepository;
     private final UserService userService;
+    private final FileStorageService fileStorageService;
 
+    @Transactional
     public Product create(ProductDTO dto, Long sellerId) {
+        validateCategoryAndCondition(dto);
         User seller = userService.getById(sellerId);
 
         Product product = Product.builder()
@@ -40,28 +53,39 @@ public class ProductService {
         return productRepository.save(product);
     }
 
+    @Transactional(readOnly = true)
     public Page<Product> getAllAvailable(Pageable pageable) {
-        return productRepository.findByStatus(AVAILABLE, pageable);
+        return productRepository.findByStatus(ProductStatus.AVAILABLE, pageable);
     }
 
+    @Transactional(readOnly = true)
     public Page<Product> getByCategory(String category, Pageable pageable) {
-        return productRepository.findByCategoryAndStatus(category, AVAILABLE, pageable);
+        return productRepository.findByCategoryAndStatus(category, ProductStatus.AVAILABLE, pageable);
     }
 
+    // Public search only surfaces AVAILABLE listings, consistent with the
+    // browse feed. (Previously it returned SOLD items too, leaking sold
+    // inventory to casual browsers.)
+    @Transactional(readOnly = true)
     public Page<Product> search(String keyword, Pageable pageable) {
-        return productRepository.findByTitleContainingIgnoreCase(keyword, pageable);
+        return productRepository.findByTitleContainingIgnoreCaseAndStatus(
+                keyword, ProductStatus.AVAILABLE, pageable);
     }
 
+    @Transactional(readOnly = true)
     public Page<Product> getBySeller(Long sellerId, Pageable pageable) {
         return productRepository.findBySellerId(sellerId, pageable);
     }
 
+    @Transactional(readOnly = true)
     public Product getById(Long id) {
-        return productRepository.findById(id)
+        return productRepository.findByIdWithSeller(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found"));
     }
 
+    @Transactional
     public Product update(Long id, ProductDTO dto, Long requesterId) {
+        validateCategoryAndCondition(dto);
         Product product = getById(id);
         requireOwnership(product, requesterId);
 
@@ -77,32 +101,64 @@ public class ProductService {
         return productRepository.save(product);
     }
 
-    public Product updateImage(Long id, String imageUrl, Long requesterId) {
+    // Ownership and existence are verified BEFORE the bytes hit the disk, so
+    // an attacker can't flood the upload folder by targeting ids they don't
+    // own. Replacing an existing image cleans up the old file.
+    @Transactional
+    public Product uploadImage(Long id, MultipartFile file, Long requesterId) {
         Product product = getById(id);
         requireOwnership(product, requesterId);
 
-        product.setImageUrl(imageUrl);
-        return productRepository.save(product);
+        String previousUrl = product.getImageUrl();
+        String imageUrl = fileStorageService.store(file);
+
+        try {
+            product.setImageUrl(imageUrl);
+            Product saved = productRepository.save(product);
+            if (previousUrl != null && !previousUrl.equals(imageUrl)) {
+                fileStorageService.delete(previousUrl);
+            }
+            return saved;
+        } catch (RuntimeException e) {
+            // If the DB write failed, don't leave the new file orphaned.
+            fileStorageService.delete(imageUrl);
+            throw e;
+        }
     }
 
+    @Transactional
     public Product markAsSold(Long id, Long requesterId) {
         Product product = getById(id);
         requireOwnership(product, requesterId);
 
-        product.setStatus(SOLD);
+        product.setStatus(ProductStatus.SOLD);
         return productRepository.save(product);
     }
 
+    @Transactional
     public void delete(Long id, Long requesterId) {
         Product product = getById(id);
         requireOwnership(product, requesterId);
 
         productRepository.delete(product);
+        // Best-effort: a leftover file is acceptable, a failed row delete is not.
+        if (product.getImageUrl() != null) {
+            fileStorageService.delete(product.getImageUrl());
+        }
     }
 
     private void requireOwnership(Product product, Long requesterId) {
         if (!product.getSeller().getId().equals(requesterId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not own this listing");
+        }
+    }
+
+    private void validateCategoryAndCondition(ProductDTO dto) {
+        if (!ALLOWED_CATEGORIES.contains(dto.getCategory())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown category");
+        }
+        if (!ALLOWED_CONDITIONS.contains(dto.getItemCondition())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown condition");
         }
     }
 }

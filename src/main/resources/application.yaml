@@ -1,34 +1,76 @@
 spring:
   datasource:
-    url: jdbc:mysql://localhost:3306/uniswap_db?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC
-    username: root          # Replace with your MySQL username
-    password:       # Replace with your MySQL password
+    # All secrets/credentials are environment-variable driven with local-dev
+    # fallbacks. useSSL is deliberately NOT hardcoded to false anymore — TLS
+    # to the DB is negotiated normally and should be required outside dev.
+    url: ${DB_URL:jdbc:mysql://localhost:3306/uniswap_db?createDatabaseIfNotExist=true&serverTimezone=UTC}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
   jpa:
     hibernate:
-      ddl-auto: update      # Automatically updates your database schema when you run the app
-    show-sql: true          # Prints the SQL queries in your console (great for debugging!)
+      ddl-auto: ${DB_DDL_AUTO:update}   # 'update' for dev; use Flyway + 'validate' in production
+    show-sql: ${JPA_SHOW_SQL:false}
+    open-in-view: false                  # no DB session held open across the whole request
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQLDialect
-        format_sql: true    # Makes the printed SQL queries easy to read
+        format_sql: true
+        jdbc.time_zone: UTC              # store/read timestamps as UTC, no JVM-zone drift
 
   servlet:
     multipart:
       max-file-size: 5MB
       max-request-size: 5MB
 
+  # Transactional email (verification/login/reset codes). Leave MAIL_HOST unset
+  # in dev — the MailService then prints the code to the backend log instead.
+  # MAIL_FROM is the verified sender address (Resend/Brevo require the From
+  # address to be one you've verified with them, which is NOT the SMTP login).
+  mail:
+    host: ${MAIL_HOST:}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    from: ${MAIL_FROM:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+  # Google "Sign in with..." — only active once GOOGLE_CLIENT_ID/SECRET are
+  # set (see OAuth2ClientConfig); GET /api/auth/config reports this to the
+  # frontend. The registration is deliberately NOT declared here: an empty
+  # client-id would make Spring Boot try to build it and fail at startup.
+  security:
+    oauth2:
+      client:
+
 server:
-  port: 8080                # The port your local server will run on
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
 
 app:
   upload:
-    dir: uploads             # Folder (relative to where the app runs) where images are saved
-    base-url: http://localhost:8080/uploads   # Public URL prefix for saved images
+    dir: ${UPLOAD_DIR:uploads}                       # Folder (relative to where the app runs) where images are saved
+    base-url: ${APP_BASE_URL:http://localhost:8080/uploads}   # Public URL prefix for saved images
+  # Where the browser is sent back after OAuth2.
+  frontend-url: ${APP_FRONTEND_URL:http://localhost:3000}
+  # The backend's own public origin, used to build the full Google auth URL.
+  backend-url: ${APP_BACKEND_URL:http://localhost:8080}
+  verification-code:
+    ttl-minutes: ${VERIFICATION_CODE_TTL_MINUTES:10}
 
 jwt:
-  # Dev-only secret. Must be at least 256 bits (32+ characters) for HS256.
-  # Replace with a value from an environment variable before deploying anywhere real.
-  secret: uniswap-dev-secret-key-change-this-before-deploying-anywhere-real-0000
+  # HS256 requires 32+ bytes. Override with the JWT_SECRET env var in any
+  # real environment — the dev fallback here must never ship to production.
+  secret: ${JWT_SECRET:uniswap-dev-secret-key-change-this-before-deploying-anywhere-real-0000}
   expiration-ms: 86400000   # 24 hours

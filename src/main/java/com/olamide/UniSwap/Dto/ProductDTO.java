@@ -1,8 +1,6 @@
 package com.olamide.UniSwap.Dto;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -11,6 +9,7 @@ import lombok.Setter;
 
 import com.olamide.UniSwap.Entity.Product;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 // Used both to receive a new/updated listing from the client and to send
@@ -26,20 +25,28 @@ public class ProductDTO {
     private Long id;
 
     @NotBlank(message = "Title is required")
+    @Size(max = 120, message = "Title must be at most 120 characters")
     private String title;
 
+    @Size(max = 5000, message = "Description must be at most 5000 characters")
     private String description;
 
     @NotNull(message = "Price is required")
     @Positive(message = "Price must be greater than zero")
-    private Double price;
+    @Digits(integer = 8, fraction = 2, message = "Price must have at most 8 digits and 2 decimal places")
+    private BigDecimal price;
 
     @NotBlank(message = "Category is required")
+    @Size(max = 50, message = "Category must be at most 50 characters")
     private String category;
 
     @NotBlank(message = "Condition is required")
+    @Size(max = 50, message = "Condition must be at most 50 characters")
     private String itemCondition;
 
+    // Read-only from the client's perspective: the service never copies this
+    // onto the entity on create/update, and on the way out it carries the
+    // server-authoritative status as a string ("AVAILABLE"/"SOLD").
     private String status;
 
     private String imageUrl;
@@ -58,7 +65,7 @@ public class ProductDTO {
                 .price(product.getPrice())
                 .category(product.getCategory())
                 .itemCondition(product.getItemCondition())
-                .status(product.getStatus())
+                .status(product.getStatus().name())
                 .imageUrl(product.getImageUrl())
                 .sellerId(product.getSeller().getId())
                 .sellerUsername(product.getSeller().getUsername())

@@ -9,30 +9,26 @@ import lombok.Setter;
 
 import java.time.LocalDateTime;
 
-// Safe-to-expose shape of a User. Deliberately excludes the password hash.
-// Never send the User entity itself back through a Controller — always map
-// through this first.
+// The minimal, safe shape of another user's profile shown on a listing or
+// product page. Deliberately EXCLUDES email and phoneNumber — a buyer should
+// not be able to harvest every seller's contact details by id. The full
+// profile (with contact info) is only returned to the user themselves via
+// GET /api/users/me.
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class UserResponseDTO {
+public class PublicUserResponseDTO {
 
     private Long id;
     private String username;
-    private String email;
-    private String phoneNumber;
-    private boolean emailVerified;
     private LocalDateTime createdAt;
 
-    public static UserResponseDTO fromEntity(User user) {
-        return UserResponseDTO.builder()
+    public static PublicUserResponseDTO fromEntity(User user) {
+        return PublicUserResponseDTO.builder()
                 .id(user.getId())
                 .username(user.getUsername())
-                .email(user.getEmail())
-                .phoneNumber(user.getPhoneNumber())
-                .emailVerified(user.isEmailVerified())
                 .createdAt(user.getCreatedAt())
                 .build();
     }

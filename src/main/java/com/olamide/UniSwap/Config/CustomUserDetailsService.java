@@ -16,7 +16,10 @@ public class CustomUserDetailsService implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
-        User user = userRepository.findByEmail(email)
+        // Tokens carry the normalized (trimmed, lowercased) email as subject;
+        // normalize the lookup key too so edge-case input can't miss the row.
+        String normalized = com.olamide.UniSwap.Service.UserService.normalizeEmail(email);
+        User user = userRepository.findByEmail(normalized)
                 .orElseThrow(() -> new UsernameNotFoundException("No user with email: " + email));
         return new UserPrincipal(user);
     }

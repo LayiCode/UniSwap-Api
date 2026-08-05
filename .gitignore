@@ -33,6 +33,13 @@ build/
 .vscode/
 
 ### UniSwap ###
-# Locally uploaded product images — not part of the codebase, and this
+# Locally uploaded product images �?" not part of the codebase, and this
 # folder won't exist on a fresh clone until the app runs and creates it.
 uploads/
+
+# Local run logs
+*.log
+
+# Real secrets live in .env (read by docker compose) — never commit them.
+# Copy .env.example to .env and fill in real values.
+.env
