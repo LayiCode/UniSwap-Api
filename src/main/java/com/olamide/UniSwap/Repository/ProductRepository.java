@@ -9,24 +9,34 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.math.BigDecimal;
 import java.util.Optional;
 
 public interface ProductRepository extends JpaRepository<Product, Long> {
 
-    // @EntityGraph eagerly fetches the seller in the SAME query, killing the
-    // N+1 that previously fired one "select users" per product when the DTO
-    // mapped product.getSeller() outside a transaction.
+    // Single query for the whole browse feed: every filter is optional and
+    // combined with AND, so search/category/condition/price can be mixed
+    // freely (previously search and category were mutually exclusive). The
+    // keyword parameter arrives already wrapped in %..% and lowercased by the
+    // service, and it matches BOTH title and description.
     @EntityGraph(attributePaths = "seller")
-    Page<Product> findByStatus(ProductStatus status, Pageable pageable);
-
-    @EntityGraph(attributePaths = "seller")
-    Page<Product> findByCategoryAndStatus(String category, ProductStatus status, Pageable pageable);
+    @Query("select p from Product p where p.status = :status " +
+            "and (:keyword is null or lower(p.title) like :keyword or lower(p.description) like :keyword) " +
+            "and (:category is null or p.category = :category) " +
+            "and (:condition is null or p.itemCondition = :condition) " +
+            "and (:minPrice is null or p.price >= :minPrice) " +
+            "and (:maxPrice is null or p.price <= :maxPrice)")
+    Page<Product> searchFilters(
+            @Param("status") ProductStatus status,
+            @Param("keyword") String keyword,
+            @Param("category") String category,
+            @Param("condition") String condition,
+            @Param("minPrice") BigDecimal minPrice,
+            @Param("maxPrice") BigDecimal maxPrice,
+            Pageable pageable);
 
     @EntityGraph(attributePaths = "seller")
     Page<Product> findBySellerId(Long sellerId, Pageable pageable);
-
-    @EntityGraph(attributePaths = "seller")
-    Page<Product> findByTitleContainingIgnoreCaseAndStatus(String keyword, ProductStatus status, Pageable pageable);
 
     // Join-fetch the seller for single lookups too, so ProductDTO mapping in
     // the controller never triggers a lazy load (which would throw once

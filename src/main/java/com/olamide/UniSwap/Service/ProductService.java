@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
 import java.util.Set;
 
 @Service
@@ -55,21 +56,24 @@ public class ProductService {
 
     @Transactional(readOnly = true)
     public Page<Product> getAllAvailable(Pageable pageable) {
-        return productRepository.findByStatus(ProductStatus.AVAILABLE, pageable);
+        return searchProducts(null, null, null, null, null, pageable);
     }
 
     @Transactional(readOnly = true)
-    public Page<Product> getByCategory(String category, Pageable pageable) {
-        return productRepository.findByCategoryAndStatus(category, ProductStatus.AVAILABLE, pageable);
-    }
-
-    // Public search only surfaces AVAILABLE listings, consistent with the
-    // browse feed. (Previously it returned SOLD items too, leaking sold
-    // inventory to casual browsers.)
-    @Transactional(readOnly = true)
-    public Page<Product> search(String keyword, Pageable pageable) {
-        return productRepository.findByTitleContainingIgnoreCaseAndStatus(
-                keyword, ProductStatus.AVAILABLE, pageable);
+    public Page<Product> searchProducts(String keyword, String category, String condition,
+                                        BigDecimal minPrice, BigDecimal maxPrice, Pageable pageable) {
+        validatePriceRange(minPrice, maxPrice);
+        String pattern = (keyword == null || keyword.isBlank())
+                ? null
+                : "%" + keyword.trim().toLowerCase() + "%";
+        return productRepository.searchFilters(
+                ProductStatus.AVAILABLE,
+                pattern,
+                blankToNull(category),
+                blankToNull(condition),
+                minPrice,
+                maxPrice,
+                pageable);
     }
 
     @Transactional(readOnly = true)
@@ -150,6 +154,23 @@ public class ProductService {
     private void requireOwnership(Product product, Long requesterId) {
         if (!product.getSeller().getId().equals(requesterId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not own this listing");
+        }
+    }
+
+    private String blankToNull(String value) {
+        return (value == null || value.isBlank()) ? null : value.trim();
+    }
+
+    private void validatePriceRange(BigDecimal minPrice, BigDecimal maxPrice) {
+        if (minPrice != null && minPrice.signum() < 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Minimum price cannot be negative");
+        }
+        if (maxPrice != null && maxPrice.signum() < 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Maximum price cannot be negative");
+        }
+        if (minPrice != null && maxPrice != null && minPrice.compareTo(maxPrice) > 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Minimum price cannot exceed maximum price");
         }
     }
 

@@ -82,6 +82,22 @@ class ProductControllerIntegrationTest {
                 .build();
     }
 
+    private void createProduct(String token, String title, String description,
+                               String price, String category, String condition) throws Exception {
+        ProductDTO listing = ProductDTO.builder()
+                .title(title)
+                .description(description)
+                .price(new java.math.BigDecimal(price))
+                .category(category)
+                .itemCondition(condition)
+                .build();
+        mockMvc.perform(post("/api/products")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(listing)))
+                .andExpect(status().isCreated());
+    }
+
     @Test
     void getAllProducts_isPubliclyAccessible_withoutAuth() throws Exception {
         mockMvc.perform(get("/api/products"))
@@ -161,5 +177,52 @@ class ProductControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(1))
                 .andExpect(jsonPath("$.content[0].sellerUsername").value("seller1"));
+    }
+
+    @Test
+    void getAllProducts_combinesSearchCategoryAndPriceRange() throws Exception {
+        String token = registerAndGetToken("filter1", "filter1@student.lautech.edu.ng");
+        createProduct(token, "MacBook Pro", "Apple laptop 16GB", "850000.00", "Electronics", "Brand New");
+        createProduct(token, "Dell Laptop", "Dell XPS 13 laptop", "250000.00", "Electronics", "Neatly Used");
+        createProduct(token, "HP Printer", "Office printer", "45000.00", "Electronics", "Neatly Used");
+
+        // search matches title AND description; combined with category + price range
+        mockMvc.perform(get("/api/products")
+                        .param("search", "laptop")
+                        .param("category", "Electronics")
+                        .param("minPrice", "100000")
+                        .param("maxPrice", "900000"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(2)); // MacBook + Dell
+    }
+
+    @Test
+    void getAllProducts_filtersByCondition_andSortsByPriceAscending() throws Exception {
+        String token = registerAndGetToken("filter2", "filter2@student.lautech.edu.ng");
+        createProduct(token, "MacBook Pro", "Apple laptop", "850000.00", "Electronics", "Brand New");
+        createProduct(token, "Dell Laptop", "Dell XPS", "250000.00", "Electronics", "Neatly Used");
+        createProduct(token, "HP Printer", "Office printer", "45000.00", "Electronics", "Neatly Used");
+
+        mockMvc.perform(get("/api/products")
+                        .param("condition", "Neatly Used")
+                        .param("sort", "price_asc"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(2))
+                .andExpect(jsonPath("$.content[0].title").value("HP Printer"))
+                .andExpect(jsonPath("$.content[1].title").value("Dell Laptop"));
+    }
+
+    @Test
+    void getAllProducts_rejectsUnknownSort() throws Exception {
+        mockMvc.perform(get("/api/products").param("sort", "bogus"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void getAllProducts_rejectsMinPriceAboveMaxPrice() throws Exception {
+        mockMvc.perform(get("/api/products")
+                        .param("minPrice", "100")
+                        .param("maxPrice", "50"))
+                .andExpect(status().isBadRequest());
     }
 }

@@ -18,6 +18,8 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
+
 @RestController
 @RequestMapping("/api/products")
 @RequiredArgsConstructor
@@ -27,28 +29,27 @@ public class ProductController {
 
     private final ProductService productService;
 
-    // GET /api/products                          -> all available listings, page 0, size 10, newest first
-    // GET /api/products?page=1&size=20            -> page 1, 20 per page
-    // GET /api/products?category=Electronics      -> available listings in category X
-    // GET /api/products?search=laptop             -> available listings whose title contains "laptop"
+    // GET /api/products                                             -> all available listings, page 0, size 10, newest first
+    // GET /api/products?page=1&size=20                               -> page 1, 20 per page
+    // GET /api/products?category=Electronics                          -> available listings in category X
+    // GET /api/products?search=laptop                                 -> title/description contains "laptop"
+    // GET /api/products?search=laptop&category=Electronics            -> combined search + category
+    // GET /api/products?condition=Brand New&minPrice=1000&maxPrice=50000
+    // GET /api/products?sort=price_asc|price_desc|newest              -> sort (default newest)
     @GetMapping
     public ResponseEntity<PageResponseDTO<ProductDTO>> getAll(
-            @RequestParam(required = false) String category,
             @RequestParam(required = false) String search,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String condition,
+            @RequestParam(required = false) BigDecimal minPrice,
+            @RequestParam(required = false) BigDecimal maxPrice,
+            @RequestParam(defaultValue = "newest") String sort,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size
     ) {
-        Pageable pageable = buildPageable(page, size);
-        Page<Product> products;
-
-        if (search != null && !search.isBlank()) {
-            products = productService.search(search, pageable);
-        } else if (category != null && !category.isBlank()) {
-            products = productService.getByCategory(category, pageable);
-        } else {
-            products = productService.getAllAvailable(pageable);
-        }
-
+        Pageable pageable = buildPageable(page, size, sort);
+        Page<Product> products = productService.searchProducts(
+                search, category, condition, minPrice, maxPrice, pageable);
         return ResponseEntity.ok(toPageResponse(products));
     }
 
@@ -134,9 +135,19 @@ public class ProductController {
     // the DB to load an enormous result set. Newest-first by default since
     // that's the natural browse order for a marketplace feed.
     private Pageable buildPageable(int page, int size) {
+        return buildPageable(page, size, "newest");
+    }
+
+    private Pageable buildPageable(int page, int size, String sort) {
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
-        return PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "createdAt"));
+        return switch (sort == null ? "newest" : sort) {
+            case "price_asc" -> PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.ASC, "price"));
+            case "price_desc" -> PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "price"));
+            case "newest" -> PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "createdAt"));
+            default -> throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Unknown sort '" + sort + "' (expected newest, price_asc or price_desc)");
+        };
     }
 
     private PageResponseDTO<ProductDTO> toPageResponse(Page<Product> products) {
