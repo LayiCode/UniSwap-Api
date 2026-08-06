@@ -57,7 +57,16 @@ public class ProductDTO {
 
     private LocalDateTime createdAt;
 
+    // Whether the authenticated viewer has saved this listing. Always false
+    // for anonymous requests and for the author's own read paths; computed by
+    // the controller, never accepted from the client on create/update.
+    private boolean favorited;
+
     public static ProductDTO fromEntity(Product product) {
+        return fromEntity(product, false);
+    }
+
+    public static ProductDTO fromEntity(Product product, boolean favorited) {
         return ProductDTO.builder()
                 .id(product.getId())
                 .title(product.getTitle())
@@ -70,6 +79,7 @@ public class ProductDTO {
                 .sellerId(product.getSeller().getId())
                 .sellerUsername(product.getSeller().getUsername())
                 .createdAt(product.getCreatedAt())
+                .favorited(favorited)
                 .build();
     }
 }

@@ -4,6 +4,7 @@ import com.olamide.UniSwap.Config.UserPrincipal;
 import com.olamide.UniSwap.Dto.PageResponseDTO;
 import com.olamide.UniSwap.Dto.ProductDTO;
 import com.olamide.UniSwap.Entity.Product;
+import com.olamide.UniSwap.Service.FavoriteService;
 import com.olamide.UniSwap.Service.ProductService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/api/products")
@@ -28,6 +30,7 @@ public class ProductController {
     private static final int MAX_PAGE_SIZE = 50;
 
     private final ProductService productService;
+    private final FavoriteService favoriteService;
 
     // GET /api/products                                             -> all available listings, page 0, size 10, newest first
     // GET /api/products?page=1&size=20                               -> page 1, 20 per page
@@ -45,18 +48,23 @@ public class ProductController {
             @RequestParam(required = false) BigDecimal maxPrice,
             @RequestParam(defaultValue = "newest") String sort,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size
+            @RequestParam(defaultValue = "10") int size,
+            @AuthenticationPrincipal UserPrincipal principal
     ) {
         Pageable pageable = buildPageable(page, size, sort);
         Page<Product> products = productService.searchProducts(
                 search, category, condition, minPrice, maxPrice, pageable);
-        return ResponseEntity.ok(toPageResponse(products));
+        return ResponseEntity.ok(toPageResponse(products, principal));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ProductDTO> getById(@PathVariable Long id) {
+    public ResponseEntity<ProductDTO> getById(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserPrincipal principal
+    ) {
         Product product = productService.getById(id);
-        return ResponseEntity.ok(ProductDTO.fromEntity(product));
+        return ResponseEntity.ok(ProductDTO.fromEntity(product,
+                favoriteService.isFavorited(principalUserId(principal), id)));
     }
 
     // Requires auth — "my listings" page, includes both AVAILABLE and SOLD.
@@ -68,7 +76,7 @@ public class ProductController {
     ) {
         Pageable pageable = buildPageable(page, size);
         Page<Product> products = productService.getBySeller(currentUserId(principal), pageable);
-        return ResponseEntity.ok(toPageResponse(products));
+        return ResponseEntity.ok(toPageResponse(products, principal));
     }
 
     @PostMapping
@@ -131,6 +139,12 @@ public class ProductController {
         return principal.getId();
     }
 
+    // Anonymous viewers stay null here — browse/detail are public, and the
+    // favorited flag simply defaults to false for them.
+    private Long principalUserId(UserPrincipal principal) {
+        return (principal == null || principal.getId() == null) ? null : principal.getId();
+    }
+
     // Caps page size server-side — a client sending ?size=100000 can't force
     // the DB to load an enormous result set. Newest-first by default since
     // that's the natural browse order for a marketplace feed.
@@ -150,7 +164,15 @@ public class ProductController {
         };
     }
 
-    private PageResponseDTO<ProductDTO> toPageResponse(Page<Product> products) {
-        return PageResponseDTO.from(products, products.getContent().stream().map(ProductDTO::fromEntity).toList());
+    // Same shape as toPageResponse but no N+1: the whole page's favorited ids
+    // are fetched in one query, keyed off the current viewer (null for
+    // anonymous requests, in which case everything maps to false).
+    private PageResponseDTO<ProductDTO> toPageResponse(Page<Product> products, UserPrincipal principal) {
+        Set<Long> favorited = favoriteService.getFavoritedProductIds(
+                principalUserId(principal),
+                products.getContent().stream().map(Product::getId).toList());
+        return PageResponseDTO.from(products, products.getContent().stream()
+                .map(p -> ProductDTO.fromEntity(p, favorited.contains(p.getId())))
+                .toList());
     }
 }
