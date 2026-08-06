@@ -1,12 +1,11 @@
 spring:
   datasource:
     # All secrets/credentials are environment-variable driven with local-dev
-    # fallbacks. useSSL is deliberately NOT hardcoded to false anymore — TLS
-    # to the DB is negotiated normally and should be required outside dev.
-    url: ${DB_URL:jdbc:mysql://localhost:3306/uniswap_db?createDatabaseIfNotExist=true&serverTimezone=UTC}
-    username: ${DB_USERNAME:root}
+    # fallbacks. The local default points at a PostgreSQL 18 install on 5432.
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/uniswap_db}
+    username: ${DB_USERNAME:uniswap}
     password: ${DB_PASSWORD:}
-    driver-class-name: com.mysql.cj.jdbc.Driver
+    driver-class-name: org.postgresql.Driver
 
   jpa:
     hibernate:
@@ -15,7 +14,7 @@ spring:
     open-in-view: false                  # no DB session held open across the whole request
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.MySQLDialect
+        dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
         jdbc.time_zone: UTC              # store/read timestamps as UTC, no JVM-zone drift
 
@@ -57,6 +56,9 @@ management:
     web:
       exposure:
         include: health,info
+  health:
+    mail:
+      enabled: false   # SMTP outages must not take /actuator/health DOWN
 
 app:
   upload:
