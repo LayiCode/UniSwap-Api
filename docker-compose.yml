@@ -2,24 +2,20 @@ name: uniswap
 
 services:
   db:
-    image: mysql:8.4
+    image: postgres:18-alpine
     restart: unless-stopped
     environment:
-      MYSQL_DATABASE: uniswap_db
-      MYSQL_USER: uniswap
-      MYSQL_PASSWORD: ${DB_PASSWORD:-uniswap-pass}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-change-me-root-pass}
-    command:
-      - --character-set-server=utf8mb4
-      - --collation-server=utf8mb4_unicode_ci
+      POSTGRES_DB: uniswap_db
+      POSTGRES_USER: ${DB_USERNAME:-uniswap}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-uniswap-pass}
     volumes:
-      - db_data:/var/lib/mysql
-    # Host port 3307 so it doesn't clash with a locally installed MySQL/XAMPP
-    # that already owns 3306.
+      - db_data:/var/lib/postgresql/data
+    # Host port 5433 so it doesn't clash with a locally installed PostgreSQL
+    # that already owns 5432.
     ports:
-      - "3307:3306"
+      - "5433:5432"
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p$$MYSQL_ROOT_PASSWORD"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-uniswap} -d uniswap_db"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -35,8 +31,8 @@ services:
     environment:
       # Unset -> MailService falls back to printing codes to the backend log,
       # exactly like local dev. Set these to send real emails via Brevo/Resend.
-      DB_URL: jdbc:mysql://db:3306/uniswap_db?createDatabaseIfNotExist=true&serverTimezone=UTC
-      DB_USERNAME: uniswap
+      DB_URL: jdbc:postgresql://db:5432/uniswap_db
+      DB_USERNAME: ${DB_USERNAME:-uniswap}
       DB_PASSWORD: ${DB_PASSWORD:-uniswap-pass}
       DB_DDL_AUTO: ${DB_DDL_AUTO:-update}
       JWT_SECRET: ${JWT_SECRET:-change-this-jwt-secret-before-deploying-anywhere-real-0000000000}
