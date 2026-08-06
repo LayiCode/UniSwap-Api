@@ -8,7 +8,7 @@ A peer-to-peer campus marketplace REST API, built with Spring Boot. Students can
 - **Spring Boot 4.1.0**
 - **Spring Data JPA** (Hibernate) — persistence
 - **Spring Security** + **JWT** (jjwt 0.12.6) — stateless authentication
-- **MySQL** — database
+- **PostgreSQL** — database
 - **Lombok** — boilerplate reduction
 - **Maven** — build tool
 
@@ -44,7 +44,7 @@ com.olamide.UniSwap
 
 - Java 21+
 - Maven (or use the included `mvnw` wrapper)
-- MySQL running locally
+- PostgreSQL 18+ running locally
 
 ### Setup
 
@@ -152,14 +152,14 @@ All request/response bodies are JSON. Endpoints marked 🔒 require an `Authoriz
 ## Deployment (Docker)
 
 A `Dockerfile` (multi-stage Maven build → JRE 21) and `docker-compose.yml`
-ship the MySQL DB + backend together. The frontend is a separate repo
+ship the PostgreSQL DB + backend together. The frontend is a separate repo
 (`uniswap-frontend`) referenced as a sibling directory (`../uniswap-frontend`).
 
 Pre-deploy checklist:
 
 1. Set real values in `.env` (see `.env.example`) — especially:
    - `JWT_SECRET` — a long random string (`openssl rand -base64 48`)
-   - `DB_PASSWORD` / `MYSQL_ROOT_PASSWORD`
+   - `DB_USERNAME` / `DB_PASSWORD`
    - `APP_BASE_URL`, `APP_FRONTEND_URL`, `APP_BACKEND_URL` — your public origins
    - `CORS_ALLOWED_ORIGINS` — your frontend origin(s)
    - `MAIL_*` (Brevo) and `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`
@@ -168,8 +168,8 @@ Pre-deploy checklist:
    ```bash
    docker compose up --build -d
    ```
-   The API is on `:8080` and the DB on host `:3307` (so it never clashes with a
-   local MySQL on `:3306`). Uploaded images persist in a named volume.
+   The API is on `:8080` and the DB on host `:5433` (so it never clashes with a
+   local PostgreSQL on `:5432`). Uploaded images persist in a named volume.
 3. Swap `DB_DDL_AUTO=update` for Flyway + `validate` before going to production.
 
 ## Security Notes
