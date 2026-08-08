@@ -139,6 +139,16 @@ public class ProductService {
         return productRepository.save(product);
     }
 
+    // Status transition performed on behalf of moderation (e.g. removing a
+    // reported listing). Deliberately has no ownership check — only the admin
+    // report flow calls this, and that path is guarded by hasRole("ADMIN").
+    @Transactional
+    public Product moderateStatus(Long id, ProductStatus status) {
+        Product product = getById(id);
+        product.setStatus(status);
+        return productRepository.save(product);
+    }
+
     @Transactional
     public void delete(Long id, Long requesterId) {
         Product product = getById(id);

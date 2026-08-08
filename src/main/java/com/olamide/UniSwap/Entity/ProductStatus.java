@@ -7,5 +7,9 @@ package com.olamide.UniSwap.Entity;
 // set of transitions to hang logic off of later.
 public enum ProductStatus {
     AVAILABLE,
-    SOLD
+    SOLD,
+    // Set by moderation when a listing is found to violate the rules. Browse
+    // only ever returns AVAILABLE, so a removed listing vanishes from the
+    // marketplace; the seller still sees it in their inventory.
+    REMOVED
 }

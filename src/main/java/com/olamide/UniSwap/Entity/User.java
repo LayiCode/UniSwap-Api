@@ -37,6 +37,13 @@ public class User {
     @Column(name = "email_verified", nullable = false)
     private boolean emailVerified;
 
+    // Staff/admin flag. Normal users never set this (register/OAuth builders
+    // leave it false); it is flipped by a privileged action or direct DB
+    // change. UserPrincipal turns it into a ROLE_ADMIN authority so the
+    // moderation endpoints can be secured with hasRole("ADMIN").
+    @Column(nullable = false)
+    private boolean admin;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 

@@ -24,6 +24,7 @@ public class UserResponseDTO {
     private String email;
     private String phoneNumber;
     private boolean emailVerified;
+    private boolean admin;
     private LocalDateTime createdAt;
 
     public static UserResponseDTO fromEntity(User user) {
@@ -33,6 +34,7 @@ public class UserResponseDTO {
                 .email(user.getEmail())
                 .phoneNumber(user.getPhoneNumber())
                 .emailVerified(user.isEmailVerified())
+                .admin(user.isAdmin())
                 .createdAt(user.getCreatedAt())
                 .build();
     }

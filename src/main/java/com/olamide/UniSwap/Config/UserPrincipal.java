@@ -3,6 +3,7 @@ package com.olamide.UniSwap.Config;
 import com.olamide.UniSwap.Entity.User;
 import lombok.Getter;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.Collection;
@@ -28,9 +29,15 @@ public class UserPrincipal implements UserDetails {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        // No roles/permissions system yet — every authenticated user has the
-        // same single implicit role. Revisit if you add e.g. an ADMIN role.
-        return List.of();
+        // Two implicit roles. Everyone gets ROLE_USER (the minimum, useful for
+        // hasRole-based rules later), and staff accounts additionally get
+        // ROLE_ADMIN which unlocks the moderation endpoints. The flag is read
+        // from the entity each request (CustomUserDetailsService reloads it),
+        // so a freshly promoted account takes effect immediately.
+        if (user.isAdmin()) {
+            return List.of(new SimpleGrantedAuthority("ROLE_ADMIN"));
+        }
+        return List.of(new SimpleGrantedAuthority("ROLE_USER"));
     }
 
     @Override

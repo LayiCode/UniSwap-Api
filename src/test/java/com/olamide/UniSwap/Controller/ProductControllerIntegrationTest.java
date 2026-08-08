@@ -225,4 +225,23 @@ class ProductControllerIntegrationTest {
                         .param("maxPrice", "50"))
                 .andExpect(status().isBadRequest());
     }
+
+    @Test
+    void createProduct_withLeanFrontendPayload_succeeds() throws Exception {
+        // Regression: the browser only sends the five form fields (see
+        // ProductForm/ProductInput). Jackson 3 rejects a missing PRIMITIVE
+        // field in a @RequestBody, so the boolean flags must be nullable
+        // (Boolean) rather than primitives, or every listing created from the
+        // app would 400.
+        String token = registerAndGetToken("lean1", "lean1@student.lautech.edu.ng");
+
+        mockMvc.perform(post("/api/products")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"Lean Item\",\"description\":null,\"price\":100,"
+                                + "\"category\":\"Books\",\"itemCondition\":\"Brand New\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.title").value("Lean Item"))
+                .andExpect(jsonPath("$.favorited").value(false));
+    }
 }

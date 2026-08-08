@@ -4,8 +4,10 @@ import com.olamide.UniSwap.Config.UserPrincipal;
 import com.olamide.UniSwap.Dto.PageResponseDTO;
 import com.olamide.UniSwap.Dto.ProductDTO;
 import com.olamide.UniSwap.Entity.Product;
+import com.olamide.UniSwap.Entity.ProductStatus;
 import com.olamide.UniSwap.Service.FavoriteService;
 import com.olamide.UniSwap.Service.ProductService;
+import com.olamide.UniSwap.Service.PurchaseRequestService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -31,6 +33,7 @@ public class ProductController {
 
     private final ProductService productService;
     private final FavoriteService favoriteService;
+    private final PurchaseRequestService purchaseRequestService;
 
     // GET /api/products                                             -> all available listings, page 0, size 10, newest first
     // GET /api/products?page=1&size=20                               -> page 1, 20 per page
@@ -63,8 +66,17 @@ public class ProductController {
             @AuthenticationPrincipal UserPrincipal principal
     ) {
         Product product = productService.getById(id);
-        return ResponseEntity.ok(ProductDTO.fromEntity(product,
-                favoriteService.isFavorited(principalUserId(principal), id)));
+        // A listing removed by moderation is hidden from everyone except the
+        // seller (who still needs to see/delete it in their inventory) and
+        // admins (who may want to double-check the removal).
+        if (product.getStatus() == ProductStatus.REMOVED
+                && !canViewRemoved(product, principal)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found");
+        }
+        ProductDTO dto = ProductDTO.fromEntity(product,
+                favoriteService.isFavorited(principalUserId(principal), id));
+        dto.setPurchaseRequested(purchaseRequestService.hasPendingRequest(principalUserId(principal), id));
+        return ResponseEntity.ok(dto);
     }
 
     // Requires auth — "my listings" page, includes both AVAILABLE and SOLD.
@@ -143,6 +155,16 @@ public class ProductController {
     // favorited flag simply defaults to false for them.
     private Long principalUserId(UserPrincipal principal) {
         return (principal == null || principal.getId() == null) ? null : principal.getId();
+    }
+
+    // True when the caller may still view a moderated-away listing. The seller
+    // keeps access so they can manage/delete it; admins can audit the removal.
+    private boolean canViewRemoved(Product product, UserPrincipal principal) {
+        if (principal == null || principal.getId() == null) {
+            return false;
+        }
+        return principal.getUser().isAdmin()
+                || product.getSeller().getId().equals(principal.getId());
     }
 
     // Caps page size server-side — a client sending ?size=100000 can't force

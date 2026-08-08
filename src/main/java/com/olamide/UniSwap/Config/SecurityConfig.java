@@ -64,6 +64,21 @@ public class SecurityConfig {
                         // Health checks from load balancers / uptime monitors
                         // must be reachable without auth.
                         .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/info").permitAll()
+                        // The container's error page is reached on an ERROR dispatch
+                        // (e.g. after the default AccessDeniedHandler responds with
+                        // sendError(403)). That dispatch is re-secured like any other
+                        // request, so without this rule it falls through to
+                        // anyRequest().authenticated(), is denied as anonymous, and a
+                        // genuine 403 is masked by a 401. Permit it so the real
+                        // status code reaches the client.
+                        .requestMatchers("/error").permitAll()
+                        // Any logged-in student can file a report (POST /api/reports);
+                        // seeing the moderation queue and acting on reports is
+                        // staff-only. The hasRole rules must be declared before
+                        // anyRequest().authenticated() below or they'd never run.
+                        .requestMatchers(HttpMethod.POST, "/api/reports").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/reports/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PATCH, "/api/reports/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(authenticationEntryPoint()))

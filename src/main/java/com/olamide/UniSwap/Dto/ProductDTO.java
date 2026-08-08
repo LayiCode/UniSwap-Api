@@ -60,7 +60,15 @@ public class ProductDTO {
     // Whether the authenticated viewer has saved this listing. Always false
     // for anonymous requests and for the author's own read paths; computed by
     // the controller, never accepted from the client on create/update.
-    private boolean favorited;
+    // Boolean (not the primitive) because this DTO doubles as the create/update
+    // request body, and Jackson 3 rejects a missing primitive field.
+    private Boolean favorited;
+
+    // Whether the authenticated viewer currently has a pending request to buy
+    // this listing. Populated on the detail view only (that's the only place
+    // the request-to-buy button lives); false when unauthenticated or no
+    // request exists. Never accepted from the client.
+    private Boolean purchaseRequested;
 
     public static ProductDTO fromEntity(Product product) {
         return fromEntity(product, false);
