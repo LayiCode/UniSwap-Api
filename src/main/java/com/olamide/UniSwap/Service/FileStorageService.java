@@ -1,5 +1,6 @@
 package com.olamide.UniSwap.Service;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -8,6 +9,10 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -21,21 +26,38 @@ public class FileStorageService {
     private static final List<String> ALLOWED_CONTENT_TYPES =
             List.of("image/jpeg", "image/png", "image/webp");
 
+    private static final HttpClient HTTP_CLIENT = HttpClient.newHttpClient();
+
     private final Path uploadRoot;
     private final String baseUrl;
+    private final String supabaseUrl;
+    private final String supabaseServiceKey;
+    private final String supabaseBucket;
 
+    @Autowired
     public FileStorageService(
             @Value("${app.upload.dir}") String uploadDir,
-            @Value("${app.upload.base-url}") String baseUrl
+            @Value("${app.upload.base-url}") String baseUrl,
+            @Value("${app.upload.supabase-url:}") String supabaseUrl,
+            @Value("${app.upload.supabase-service-key:}") String supabaseServiceKey,
+            @Value("${app.upload.supabase-bucket:}") String supabaseBucket
     ) {
         this.uploadRoot = Paths.get(uploadDir).toAbsolutePath().normalize();
         this.baseUrl = baseUrl;
+        this.supabaseUrl = normalizeSupabaseUrl(supabaseUrl);
+        this.supabaseServiceKey = supabaseServiceKey;
+        this.supabaseBucket = supabaseBucket;
 
         try {
             Files.createDirectories(this.uploadRoot);
         } catch (IOException e) {
             throw new IllegalStateException("Could not create upload directory: " + uploadRoot, e);
         }
+    }
+
+    // Disk-only convenience for the unit tests — no Supabase configured.
+    FileStorageService(String uploadDir, String baseUrl) {
+        this(uploadDir, baseUrl, "", "", "");
     }
 
     // Validates, saves the file under a random filename, and returns the
@@ -63,6 +85,10 @@ public class FileStorageService {
         }
 
         String storedFilename = UUID.randomUUID() + detected.extension;
+
+        if (supabaseEnabled()) {
+            return supabaseStore(storedFilename, declaredType, file);
+        }
 
         // Resolve then re-check the path stays inside uploadRoot — defends
         // against a crafted filename trying to escape the upload directory
@@ -93,6 +119,11 @@ public class FileStorageService {
             return;
         }
 
+        if (supabaseEnabled()) {
+            deleteFromSupabase(filename);
+            return;
+        }
+
         Path target = uploadRoot.resolve(filename).normalize();
         if (!target.getParent().equals(uploadRoot)) {
             return;
@@ -103,6 +134,70 @@ public class FileStorageService {
         } catch (IOException e) {
             // Logged nowhere loud on purpose — cleanup is best-effort.
         }
+    }
+
+    // Pushes the (already magic-byte-validated) bytes to Supabase Storage and
+    // returns the public URL the frontend renders in <img> tags. The bucket
+    // must be public; the service_role key authorizes the write and is only
+    // ever used server-side.
+    private String supabaseStore(String filename, String contentType, MultipartFile file) {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(supabaseUrl + "/storage/v1/object/" + supabaseBucket + "/" + filename))
+                .header("Authorization", "Bearer " + supabaseServiceKey)
+                .header("Content-Type", contentType)
+                .header("x-upsert", "true")
+                .POST(HttpRequest.BodyPublishers.ofByteArray(readAllBytes(file)))
+                .build();
+
+        if (send(request).statusCode() / 100 != 2) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to store file");
+        }
+        return supabaseUrl + "/storage/v1/object/public/" + supabaseBucket + "/" + filename;
+    }
+
+    // Best-effort removal from Supabase Storage, mirroring the disk path's
+    // contract — a stray object is far less damaging than a failed DB write.
+    private void deleteFromSupabase(String filename) {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(supabaseUrl + "/storage/v1/object/" + supabaseBucket + "/" + filename))
+                .header("Authorization", "Bearer " + supabaseServiceKey)
+                .DELETE()
+                .build();
+        try {
+            send(request);
+        } catch (ResponseStatusException e) {
+            // Cleanup failures are swallowed on purpose.
+        }
+    }
+
+    private HttpResponse<String> send(HttpRequest request) {
+        try {
+            return HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to store file");
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to store file");
+        }
+    }
+
+    private byte[] readAllBytes(MultipartFile file) {
+        try (InputStream in = file.getInputStream()) {
+            return in.readAllBytes();
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to store file");
+        }
+    }
+
+    private boolean supabaseEnabled() {
+        return !supabaseUrl.isBlank()
+                && !supabaseServiceKey.isBlank()
+                && !supabaseBucket.isBlank();
+    }
+
+    // Tolerate a trailing slash pasted from the Supabase dashboard.
+    private static String normalizeSupabaseUrl(String url) {
+        return url == null ? "" : url.replaceAll("/+$", "");
     }
 
     private byte[] readHeader(MultipartFile file) {

@@ -64,6 +64,13 @@ app:
   upload:
     dir: ${UPLOAD_DIR:uploads}                       # Folder (relative to where the app runs) where images are saved
     base-url: ${APP_BASE_URL:http://localhost:8080/uploads}   # Public URL prefix for saved images
+    # Production images: when SUPABASE_URL is set, uploads go to Supabase
+    # Storage instead of the local disk (PaaS filesystems are ephemeral and
+    # wiped on every redeploy). The service_role key bypasses RLS and must
+    # only ever live in the backend's env, never in the frontend.
+    supabase-url: ${SUPABASE_URL:}
+    supabase-service-key: ${SUPABASE_SERVICE_KEY:}
+    supabase-bucket: ${SUPABASE_STORAGE_BUCKET:}
   # Where the browser is sent back after OAuth2.
   frontend-url: ${APP_FRONTEND_URL:http://localhost:3000}
   # The backend's own public origin, used to build the full Google auth URL.

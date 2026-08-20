@@ -1,14 +1,20 @@
 package com.olamide.UniSwap.Service;
 
+import com.sun.net.httpserver.HttpServer;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -135,5 +141,117 @@ class FileStorageServiceTest {
         try (var stream = Files.list(dir)) {
             return stream.findAny().isEmpty();
         }
+    }
+
+    // ---- Supabase Storage path --------------------------------------------
+
+    @TempDir
+    Path supabaseTempDir;
+
+    private HttpServer supabase;
+
+    @AfterEach
+    void stopSupabaseStub() {
+        if (supabase != null) {
+            supabase.stop(0);
+        }
+    }
+
+    // Starts a fake Supabase Storage on an ephemeral port and returns the
+    // base URL to hand the service (trailing slash included on purpose —
+    // normalizeSupabaseUrl must tolerate it).
+    private String startSupabaseStub(int status, AtomicReference<String> method,
+                                     AtomicReference<String> authHeader,
+                                     AtomicReference<String> contentType,
+                                     AtomicReference<byte[]> body) throws IOException {
+        supabase = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+        supabase.createContext("/storage/v1/object/test-bucket", exchange -> {
+            method.set(exchange.getRequestMethod());
+            authHeader.set(exchange.getRequestHeaders().getFirst("Authorization"));
+            contentType.set(exchange.getRequestHeaders().getFirst("Content-Type"));
+            body.set(exchange.getRequestBody().readAllBytes());
+            exchange.sendResponseHeaders(status, -1);
+            exchange.close();
+        });
+        supabase.start();
+        int port = supabase.getAddress().getPort();
+        return "http://localhost:" + port + "/";
+    }
+
+    private FileStorageService newSupabaseService(String baseUrl) {
+        return new FileStorageService(
+                supabaseTempDir.toString(), "http://localhost:8080/uploads",
+                baseUrl, "test-service-key", "test-bucket");
+    }
+
+    @Test
+    void store_uploadsToSupabaseAndReturnsPublicUrl() throws Exception {
+        AtomicReference<String> method = new AtomicReference<>();
+        AtomicReference<String> auth = new AtomicReference<>();
+        AtomicReference<String> type = new AtomicReference<>();
+        AtomicReference<byte[]> body = new AtomicReference<>();
+        String stubUrl = startSupabaseStub(200, method, auth, type, body);
+
+        MultipartFile file = new MockMultipartFile("file", "photo.jpg", "image/jpeg", JPEG_BYTES);
+        String url = newSupabaseService(stubUrl).store(file);
+
+        String base = stubUrl.replaceAll("/+$", "");
+        assertThat(url).startsWith(base + "/storage/v1/object/public/test-bucket/")
+                .endsWith(".jpg");
+        assertThat(method.get()).isEqualTo("POST");
+        assertThat(auth.get()).isEqualTo("Bearer test-service-key");
+        assertThat(type.get()).isEqualTo("image/jpeg");
+        assertThat(body.get()).isEqualTo(JPEG_BYTES);
+        // Nothing leaked onto the local disk.
+        assertThat(fileHasNoEntries(supabaseTempDir)).isTrue();
+    }
+
+    @Test
+    void store_mapsSupabaseFailureTo500() throws Exception {
+        AtomicReference<String> method = new AtomicReference<>();
+        AtomicReference<String> auth = new AtomicReference<>();
+        AtomicReference<String> type = new AtomicReference<>();
+        AtomicReference<byte[]> body = new AtomicReference<>();
+        String stubUrl = startSupabaseStub(500, method, auth, type, body);
+
+        MultipartFile file = new MockMultipartFile("file", "photo.png", "image/png", PNG_BYTES);
+
+        assertThatThrownBy(() -> newSupabaseService(stubUrl).store(file))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasFieldOrPropertyWithValue("statusCode", HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    @Test
+    void delete_removesFromSupabaseBestEffort() throws Exception {
+        // A 500 from Supabase must be swallowed — cleanup failures can't blow
+        // up the caller's (e.g. product-delete) transaction.
+        AtomicReference<String> method = new AtomicReference<>();
+        AtomicReference<String> auth = new AtomicReference<>();
+        AtomicReference<String> type = new AtomicReference<>();
+        AtomicReference<byte[]> body = new AtomicReference<>();
+        String stubUrl = startSupabaseStub(500, method, auth, type, body);
+        FileStorageService service = newSupabaseService(stubUrl);
+
+        String base = stubUrl.replaceAll("/+$", "");
+
+        service.delete(base + "/storage/v1/object/public/test-bucket/abc.jpg");
+        assertThat(method.get()).isEqualTo("DELETE");
+        assertThat(auth.get()).isEqualTo("Bearer test-service-key");
+
+        service.delete("   ");
+        service.delete(null);
+    }
+
+    @Test
+    void partiallyConfiguredSupabase_fallsBackToDisk() throws Exception {
+        // Only the URL set (no key/bucket) — must behave exactly like disk mode.
+        FileStorageService service = new FileStorageService(
+                tempDir.toString(), "http://localhost:8080/uploads",
+                "https://abc.supabase.co", "", "");
+
+        String url = service.store(new MockMultipartFile("file", "a.png", "image/png", PNG_BYTES));
+
+        assertThat(url).startsWith("http://localhost:8080/uploads/");
+        assertThat(Files.exists(tempDir.resolve(url.substring(url.lastIndexOf('/') + 1)))).isTrue();
     }
 }
