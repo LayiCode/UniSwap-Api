@@ -31,11 +31,18 @@ services:
     environment:
       # Unset -> MailService falls back to printing codes to the backend log,
       # exactly like local dev. Set these to send real emails via Brevo/Resend.
-      DB_URL: jdbc:postgresql://db:5432/uniswap_db
+      # DB_URL passes through from .env so a local compose stack can target
+      # Supabase; the default keeps pointing at the local db service.
+      DB_URL: ${DB_URL:-jdbc:postgresql://db:5432/uniswap_db}
       DB_USERNAME: ${DB_USERNAME:-uniswap}
       DB_PASSWORD: ${DB_PASSWORD:-uniswap-pass}
       DB_DDL_AUTO: ${DB_DDL_AUTO:-update}
       JWT_SECRET: ${JWT_SECRET:-change-this-jwt-secret-before-deploying-anywhere-real-0000000000}
+      # Set all three (in .env) to send uploads to Supabase Storage; leave
+      # empty to keep saving images on the local disk volume.
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY:-}
+      SUPABASE_STORAGE_BUCKET: ${SUPABASE_STORAGE_BUCKET:-}
       UPLOAD_DIR: /uploads
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:8080/uploads}
       APP_FRONTEND_URL: ${APP_FRONTEND_URL:-http://localhost:3000}
