@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.MailException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 // Sends transactional emails. Spring Boot only creates a JavaMailSender bean
@@ -39,6 +40,9 @@ public class MailService {
         return host != null && !host.isBlank();
     }
 
+    // Fire-and-forget on the mailExecutor pool: SMTP latency or outages must
+    // never block the HTTP request that triggered the send.
+    @Async("mailExecutor")
     public void sendVerificationCode(String to, String code, VerificationPurpose purpose) {
         String subject = switch (purpose) {
             case SIGNUP -> "Verify your UniSwap email";
