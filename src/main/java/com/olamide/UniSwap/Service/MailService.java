@@ -75,6 +75,9 @@ public class MailService {
             message.setSubject(subject);
             message.setText(body);
             sender.send(message);
+            // Makes delivery attempts visible in production logs: if neither
+            // this line nor the error below appears, the send never ran.
+            log.info("Email queued via SMTP: to={}, purpose={}", to, purpose);
         } catch (MailException ex) {
             // Never fail the request because email delivery failed — the caller
             // (forgot-password/login-code) must not reveal whether the address exists.
