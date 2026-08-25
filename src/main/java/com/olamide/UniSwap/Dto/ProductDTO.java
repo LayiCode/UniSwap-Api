@@ -8,9 +8,11 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import com.olamide.UniSwap.Entity.Product;
+import org.hibernate.Hibernate;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 // Used both to receive a new/updated listing from the client and to send
 // listing data back out. id, status, sellerId, sellerUsername, and createdAt
@@ -51,6 +53,12 @@ public class ProductDTO {
 
     private String imageUrl;
 
+    // All photos in display order (index 0 = cover). Only populated where the
+    // images collection was actually fetched (detail lookups); list endpoints
+    // leave it null and clients fall back to imageUrl. Never accepted from
+    // the client — uploads go through the multipart endpoints.
+    private List<String> imageUrls;
+
     private Long sellerId;
 
     private String sellerUsername;
@@ -84,10 +92,22 @@ public class ProductDTO {
                 .itemCondition(product.getItemCondition())
                 .status(product.getStatus().name())
                 .imageUrl(product.getImageUrl())
+                .imageUrls(coverAndGallery(product))
                 .sellerId(product.getSeller().getId())
                 .sellerUsername(product.getSeller().getUsername())
                 .createdAt(product.getCreatedAt())
                 .favorited(favorited)
                 .build();
+    }
+
+    // Reading the lazy images collection is only legal when it was fetched
+    // with the product (detail path); touching an uninitialized collection
+    // after the session closed would throw. Legacy listings with a cover but
+    // no image rows still expose their single photo.
+    private static List<String> coverAndGallery(Product product) {
+        if (Hibernate.isInitialized(product.getImages()) && !product.getImages().isEmpty()) {
+            return product.getImages().stream().map(img -> img.getUrl()).toList();
+        }
+        return product.getImageUrl() == null ? null : List.of(product.getImageUrl());
     }
 }

@@ -22,6 +22,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Set;
 
 @RestController
@@ -120,6 +121,18 @@ public class ProductController {
             @AuthenticationPrincipal UserPrincipal principal
     ) {
         Product updated = productService.uploadImage(id, file, currentUserId(principal));
+        return ResponseEntity.ok(ProductDTO.fromEntity(updated));
+    }
+
+    // Multi-photo variant: field name "files", 1..5 images, replace-all —
+    // the submitted set becomes the listing's complete photo set.
+    @PostMapping("/{id}/images")
+    public ResponseEntity<ProductDTO> uploadImages(
+            @PathVariable Long id,
+            @RequestParam("files") List<MultipartFile> files,
+            @AuthenticationPrincipal UserPrincipal principal
+    ) {
+        Product updated = productService.uploadImages(id, files, currentUserId(principal));
         return ResponseEntity.ok(ProductDTO.fromEntity(updated));
     }
 

@@ -38,9 +38,9 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     @EntityGraph(attributePaths = "seller")
     Page<Product> findBySellerId(Long sellerId, Pageable pageable);
 
-    // Join-fetch the seller for single lookups too, so ProductDTO mapping in
-    // the controller never triggers a lazy load (which would throw once
-    // open-in-view is disabled).
-    @Query("select p from Product p join fetch p.seller where p.id = :id")
+    // Join-fetch seller AND photos for single lookups, so ProductDTO mapping
+    // in the controller never triggers a lazy load (which would throw once
+    // open-in-view is disabled). @OrderBy on Product.images sorts them.
+    @Query("select p from Product p join fetch p.seller left join fetch p.images where p.id = :id")
     Optional<Product> findByIdWithSeller(@Param("id") Long id);
 }

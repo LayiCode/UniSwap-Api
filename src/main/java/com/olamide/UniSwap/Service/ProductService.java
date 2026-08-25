@@ -2,6 +2,7 @@ package com.olamide.UniSwap.Service;
 
 import com.olamide.UniSwap.Dto.ProductDTO;
 import com.olamide.UniSwap.Entity.Product;
+import com.olamide.UniSwap.Entity.ProductImage;
 import com.olamide.UniSwap.Entity.ProductStatus;
 import com.olamide.UniSwap.Entity.User;
 import com.olamide.UniSwap.Repository.ProductRepository;
@@ -15,6 +16,9 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 
 @Service
@@ -28,6 +32,10 @@ public class ProductService {
             "Shoes", "Vehicles", "Sports", "Beauty", "Others");
     private static final Set<String> ALLOWED_CONDITIONS = Set.of(
             "Brand New", "Neatly Used", "Fairly Used", "Refurbished", "For Parts");
+
+    // Hard cap per listing; each file is additionally capped at 5MB by the
+    // global multipart limit.
+    private static final int MAX_IMAGES = 5;
 
     private final ProductRepository productRepository;
     private final UserService userService;
@@ -98,7 +106,10 @@ public class ProductService {
         product.setPrice(dto.getPrice());
         product.setCategory(dto.getCategory());
         product.setItemCondition(dto.getItemCondition());
-        product.setImageUrl(dto.getImageUrl());
+        // imageUrl/images are deliberately NOT taken from the DTO — the lean
+        // frontend payload never carries them, and copying a null here would
+        // silently detach every photo from the listing. Photos are managed
+        // exclusively through the upload endpoints.
         // status is intentionally not editable here — use markAsSold() so
         // that transition has its own explicit, auditable entry point.
 
@@ -107,27 +118,70 @@ public class ProductService {
 
     // Ownership and existence are verified BEFORE the bytes hit the disk, so
     // an attacker can't flood the upload folder by targeting ids they don't
-    // own. Replacing an existing image cleans up the old file.
+    // own. Replacing existing photos cleans up the old files.
     @Transactional
     public Product uploadImage(Long id, MultipartFile file, Long requesterId) {
+        // Arrays.asList tolerates a null element so a missing file surfaces
+        // through the shared validation path instead of an NPE.
+        return uploadImages(id, java.util.Arrays.asList(file), requesterId);
+    }
+
+    // Replace-all semantics: the submitted set becomes the listing's full
+    // photo set (index 0 = cover). Old storage objects are removed
+    // best-effort after the DB write succeeds.
+    //
+    // Identity first: existence and ownership are resolved before any
+    // validation or byte is touched, so a non-owner always learns only one
+    // thing — 403 — regardless of what they sent.
+    @Transactional
+    public Product uploadImages(Long id, List<MultipartFile> files, Long requesterId) {
         Product product = getById(id);
         requireOwnership(product, requesterId);
 
-        String previousUrl = product.getImageUrl();
-        String imageUrl = fileStorageService.store(file);
+        if (files == null || files.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "At least one image is required");
+        }
+        if (files.size() > MAX_IMAGES) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "A listing can have at most " + MAX_IMAGES + " images");
+        }
 
+        Set<String> previousUrls = collectImageUrls(product);
+
+        List<String> urls = new ArrayList<>();
         try {
-            product.setImageUrl(imageUrl);
-            Product saved = productRepository.save(product);
-            if (previousUrl != null && !previousUrl.equals(imageUrl)) {
-                fileStorageService.delete(previousUrl);
+            for (MultipartFile file : files) {
+                urls.add(fileStorageService.store(file));
             }
+            product.getImages().clear();
+            for (int i = 0; i < urls.size(); i++) {
+                product.getImages().add(ProductImage.builder()
+                        .product(product)
+                        .url(urls.get(i))
+                        .sortOrder(i)
+                        .build());
+            }
+            product.setImageUrl(urls.get(0));
+            Product saved = productRepository.save(product);
+            previousUrls.removeAll(urls);
+            previousUrls.forEach(fileStorageService::delete);
             return saved;
         } catch (RuntimeException e) {
-            // If the DB write failed, don't leave the new file orphaned.
-            fileStorageService.delete(imageUrl);
+            // If anything failed, don't leave the new files orphaned.
+            urls.forEach(fileStorageService::delete);
             throw e;
         }
+    }
+
+    // Every URL currently attached to the product: the image rows plus the
+    // legacy cover column (older listings predate the images table).
+    private Set<String> collectImageUrls(Product product) {
+        Set<String> urls = new LinkedHashSet<>();
+        product.getImages().forEach(img -> urls.add(img.getUrl()));
+        if (product.getImageUrl() != null && !product.getImageUrl().isBlank()) {
+            urls.add(product.getImageUrl());
+        }
+        return urls;
     }
 
     @Transactional
@@ -154,11 +208,10 @@ public class ProductService {
         Product product = getById(id);
         requireOwnership(product, requesterId);
 
+        Set<String> urls = collectImageUrls(product);
         productRepository.delete(product);
         // Best-effort: a leftover file is acceptable, a failed row delete is not.
-        if (product.getImageUrl() != null) {
-            fileStorageService.delete(product.getImageUrl());
-        }
+        urls.forEach(fileStorageService::delete);
     }
 
     private void requireOwnership(Product product, Long requesterId) {

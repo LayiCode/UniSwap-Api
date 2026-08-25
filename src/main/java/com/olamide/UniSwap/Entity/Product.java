@@ -6,6 +6,8 @@ import lombok.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "products")
@@ -51,6 +53,16 @@ public class Product {
 
     @Column(name = "image_url")
     private String imageUrl;
+
+    // All photos of the listing, display order. imageUrl above always mirrors
+    // images[0] (the cover) so cards, reports and purchase requests — which
+    // only read the plain column — never need the collection. Rows are
+    // managed exclusively by ProductService.uploadImages(); update() must
+    // not touch either field.
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("sortOrder ASC")
+    @Builder.Default
+    private List<ProductImage> images = new ArrayList<>();
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "seller_id", nullable = false)

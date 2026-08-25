@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
@@ -243,5 +244,88 @@ class ProductControllerIntegrationTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.title").value("Lean Item"))
                 .andExpect(jsonPath("$.favorited").value(false));
+    }
+
+    // Smallest valid PNG (1x1 transparent) — FileStorageService verifies the
+    // magic bytes, so the payload must be a real image, not random data.
+    private static final byte[] PNG = {
+            (byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 0x0D,
+            0x49, 0x48, 0x44, 0x52, 0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0, 0x1F,
+            0x15, (byte) 0xC4, (byte) 0x89, 0, 0, 0, 0x0D, 0x49, 0x44, 0x41, 0x54,
+            0x78, (byte) 0x9C, 0x63, 0, 1, 0, 0, 5, 0, 1, 0x0D, 0x0A, 0x2D,
+            (byte) 0xB4, 0, 0, 0, 0, 0x49, 0x45, 0x4E, 0x44, (byte) 0xAE, 0x42,
+            0x60, (byte) 0x82
+    };
+
+    private long createProductAndGetId(String token, String title) throws Exception {
+        ProductDTO listing = ProductDTO.builder()
+                .title(title)
+                .description("test")
+                .price(new java.math.BigDecimal("100.00"))
+                .category("Electronics")
+                .itemCondition("Neatly Used")
+                .build();
+        String body = mockMvc.perform(post("/api/products")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(listing)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        return objectMapper.readTree(body).get("id").asLong();
+    }
+
+    @Test
+    void uploadImages_storesAllPhotos_andSetsFirstAsCover() throws Exception {
+        String token = registerAndGetToken("gallery1", "gallery1@student.lautech.edu.ng");
+        long productId = createProductAndGetId(token, "Multi Photo Item");
+
+        String body = mockMvc.perform(multipart("/api/products/{id}/images", productId)
+                        .file(new MockMultipartFile("files", "a.png", "image/png", PNG))
+                        .file(new MockMultipartFile("files", "b.png", "image/png", PNG))
+                        .file(new MockMultipartFile("files", "c.png", "image/png", PNG))
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.imageUrls.length()").value(3))
+                .andReturn().getResponse().getContentAsString();
+
+        // Cover (imageUrl) must mirror the first gallery entry.
+        org.assertj.core.api.Assertions
+                .assertThat(objectMapper.readTree(body).get("imageUrl").asText())
+                .isEqualTo(objectMapper.readTree(body).get("imageUrls").get(0).asText());
+
+        // Detail lookup exposes the full gallery too.
+        mockMvc.perform(get("/api/products/{id}", productId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.imageUrls.length()").value(3))
+                .andExpect(jsonPath("$.imageUrl").isNotEmpty());
+    }
+
+    @Test
+    void uploadImages_rejectsMoreThanFiveFiles() throws Exception {
+        String token = registerAndGetToken("gallery2", "gallery2@student.lautech.edu.ng");
+        long productId = createProductAndGetId(token, "Too Many Photos");
+
+        MockMultipartFile[] six = new MockMultipartFile[6];
+        for (int i = 0; i < six.length; i++) {
+            six[i] = new MockMultipartFile("files", "img" + i + ".png", "image/png", PNG);
+        }
+
+        mockMvc.perform(multipart("/api/products/{id}/images", productId)
+                        .file(six[0]).file(six[1]).file(six[2])
+                        .file(six[3]).file(six[4]).file(six[5])
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void uploadImages_isForbidden_forNonOwner() throws Exception {
+        String ownerToken = registerAndGetToken("gallery3", "gallery3@student.lautech.edu.ng");
+        String otherToken = registerAndGetToken("gallery4", "gallery4@student.lautech.edu.ng");
+        long productId = createProductAndGetId(ownerToken, "Not Yours");
+
+        mockMvc.perform(multipart("/api/products/{id}/images", productId)
+                        .file(new MockMultipartFile("files", "a.png", "image/png", PNG))
+                        .header("Authorization", "Bearer " + otherToken))
+                .andExpect(status().isForbidden());
     }
 }
