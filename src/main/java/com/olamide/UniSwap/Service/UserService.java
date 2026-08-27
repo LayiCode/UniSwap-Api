@@ -31,17 +31,21 @@ public class UserService {
         // and the save, so "Olamide@X.com" and "olamide@x.com" can't become
         // two separate accounts that confuse login.
         String email = normalizeEmail(request.getEmail());
+        // Username is optional: when blank we derive a collision-free
+        // placeholder so the user can sign up now and pick a real name later.
         String username = request.getUsername() == null ? "" : request.getUsername().trim();
         String password = request.getPassword();
         String phoneNumber = request.getPhoneNumber() == null ? "" : request.getPhoneNumber().trim();
 
         validateCredentials(username, password, null);
 
+        if (username.isBlank()) {
+            username = uniqueUsername(null, email);
+        } else if (userRepository.existsByUsername(username)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Username is already taken");
+        }
         if (userRepository.existsByEmail(email)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Email is already registered");
-        }
-        if (userRepository.existsByUsername(username)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Username is already taken");
         }
 
         User user = User.builder()
@@ -185,18 +189,17 @@ public class UserService {
 
     // Shared rules for setting a password (register + reset): it must not be
     // the same as, contain, or closely resemble the username. Only password
-    // quality rules live here; confirmation matching is the client's job.
+    // quality rules live here; confirmation matching is the client's job. A
+    // blank username (optional at signup) just skips the similarity check.
     public void validateCredentials(String username, String password, String currentEncodedPassword) {
-        if (username == null || username.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Username is required");
-        }
         if (password == null || password.length() < 8) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Password must be at least 8 characters");
         }
         if (currentEncodedPassword != null && passwordEncoder.matches(password, currentEncodedPassword)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "New password must be different from the current one");
         }
-        if (PasswordSimilarityValidator.isRejected(username, password)) {
+        if (username != null && !username.isBlank()
+                && PasswordSimilarityValidator.isRejected(username, password)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Password must not be the same as or too similar to your username");
         }

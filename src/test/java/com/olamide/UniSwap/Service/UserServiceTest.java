@@ -97,7 +97,6 @@ class UserServiceTest {
 
     @Test
     void register_throwsConflict_whenUsernameAlreadyTaken() {
-        when(userRepository.existsByEmail(anyString())).thenReturn(false);
         when(userRepository.existsByUsername(anyString())).thenReturn(true);
 
         assertThatThrownBy(() -> userService.register(registerRequest))

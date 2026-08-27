@@ -29,7 +29,7 @@ spring:
   # address to be one you've verified with them, which is NOT the SMTP login).
   mail:
     host: ${MAIL_HOST:}
-    port: ${MAIL_PORT:587}
+    port: ${MAIL_PORT:465}
     username: ${MAIL_USERNAME:}
     password: ${MAIL_PASSWORD:}
     from: ${MAIL_FROM:}
@@ -42,8 +42,12 @@ spring:
           connectiontimeout: 10000
           timeout: 10000
           writetimeout: 10000
+          # 465 = implicit TLS (SSL) as default; set MAIL_SSL=false to use
+          # 587 STARTTLS instead (starttls.enable below then applies).
+          ssl:
+            enable: ${MAIL_SSL:true}
           starttls:
-            enable: true
+            enable: ${MAIL_STARTTLS:false}
 
   # Google "Sign in with..." — only active once GOOGLE_CLIENT_ID/SECRET are
   # set (see OAuth2ClientConfig); GET /api/auth/config reports this to the

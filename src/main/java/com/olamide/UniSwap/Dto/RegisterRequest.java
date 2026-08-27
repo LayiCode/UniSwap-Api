@@ -19,7 +19,8 @@ import lombok.Setter;
 @Builder
 public class RegisterRequest {
 
-    @NotBlank(message = "Username is required")
+    // Username is optional at signup — a placeholder is derived and the user
+    // can pick a real one later. Only enforce length if a value is provided.
     @Size(min = 3, max = 30, message = "Username must be between 3 and 30 characters")
     private String username;
 
@@ -36,7 +37,12 @@ public class RegisterRequest {
             message = "Password must contain at least one letter and one number")
     private String password;
 
+    // Phone number: relaxed on purpose — Nigerians commonly write them with a
+    // leading +234, national 0, spaces, dashes or brackets. We strip non-digits
+    // and require a plausible 10-14 digit core rather than rejecting a valid
+    // address with a strict pattern.
     @NotBlank(message = "Phone number is required")
-    @Pattern(regexp = "^\\+?[0-9]{10,14}$", message = "Phone number must be a valid number")
+    @Pattern(regexp = "^\\+?[0-9][0-9()\\-\\s]{9,17}[0-9]$",
+            message = "Phone number must be a valid number")
     private String phoneNumber;
 }
