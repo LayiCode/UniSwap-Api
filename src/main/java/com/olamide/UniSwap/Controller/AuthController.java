@@ -1,6 +1,7 @@
 package com.olamide.UniSwap.Controller;
 
 import com.olamide.UniSwap.Dto.*;
+import com.olamide.UniSwap.Exception.CooldownExceededException;
 import com.olamide.UniSwap.Service.CodeDelivery;
 import com.olamide.UniSwap.Service.LoginRateLimiter;
 import com.olamide.UniSwap.Service.PasswordResetService;
@@ -74,11 +75,18 @@ public class AuthController {
     // locked out; on a successful send no code is included in the response.
     @PostMapping("/login-code")
     public ResponseEntity<Map<String, Object>> requestLoginCode(@Valid @RequestBody LoginCodeRequest request) {
-        if (!loginRateLimiter.isAllowed("login-code:" + UserService.normalizeEmail(request.getEmail()))) {
+        String key = "login-code:" + UserService.normalizeEmail(request.getEmail());
+        long remaining = loginRateLimiter.cooldownRemainingSeconds(key);
+        if (remaining > 0) {
+            throw new CooldownExceededException(
+                    "Please wait before requesting another code.", (int) remaining);
+        }
+        if (!loginRateLimiter.isAllowed(key)) {
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
                     "Too many code requests. Please try again in a few minutes.");
         }
         CodeDelivery delivery = userService.requestLoginCode(request.getEmail());
+        loginRateLimiter.recordCodeSent(key);
         Map<String, Object> body = new java.util.HashMap<>();
         // Null value (unknown/unverified address, or a successful send) is
         // omitted rather than included-as-null so anti-enumeration holds.
@@ -101,11 +109,18 @@ public class AuthController {
     ) {
         // Throttle per email so the endpoint can't be used to spam a victim's
         // inbox. The response is identical whether or not the account exists.
-        if (!loginRateLimiter.isAllowed("reset:" + UserService.normalizeEmail(request.getEmail()))) {
+        String key = "reset:" + UserService.normalizeEmail(request.getEmail());
+        long remaining = loginRateLimiter.cooldownRemainingSeconds(key);
+        if (remaining > 0) {
+            throw new CooldownExceededException(
+                    "Please wait before requesting another code.", (int) remaining);
+        }
+        if (!loginRateLimiter.isAllowed(key)) {
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
                     "Too many reset requests. Please try again in a few minutes.");
         }
         passwordResetService.requestPasswordReset(request.getEmail());
+        loginRateLimiter.recordCodeSent(key);
         return ResponseEntity.ok().build();
     }
 
@@ -121,11 +136,18 @@ public class AuthController {
     // email delivery failed, so the user can still complete verification.
     @PostMapping("/resend-verification-code")
     public ResponseEntity<Map<String, Object>> resendVerificationCode(@Valid @RequestBody LoginCodeRequest request) {
-        if (!loginRateLimiter.isAllowed("resend:" + UserService.normalizeEmail(request.getEmail()))) {
+        String key = "resend:" + UserService.normalizeEmail(request.getEmail());
+        long remaining = loginRateLimiter.cooldownRemainingSeconds(key);
+        if (remaining > 0) {
+            throw new CooldownExceededException(
+                    "Please wait before requesting another code.", (int) remaining);
+        }
+        if (!loginRateLimiter.isAllowed(key)) {
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
                     "Too many resend requests. Please try again in a few minutes.");
         }
         CodeDelivery delivery = userService.resendSignupCode(request.getEmail());
+        loginRateLimiter.recordCodeSent(key);
         Map<String, Object> body = new java.util.HashMap<>();
         if (delivery != null && !delivery.delivered()) {
             body.put("verificationCode", delivery.code());

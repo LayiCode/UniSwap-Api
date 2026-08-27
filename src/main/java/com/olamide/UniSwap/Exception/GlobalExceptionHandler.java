@@ -56,6 +56,15 @@ public class GlobalExceptionHandler {
         return build(status, status.getReasonPhrase(), message, null);
     }
 
+    // A verification/reset code was requested again before the per-email
+    // cooldown elapsed. Returns 429 with retryAfterSeconds so the client can
+    // start its countdown from the server's remaining-wait truth.
+    @ExceptionHandler(CooldownExceededException.class)
+    public ResponseEntity<ApiErrorResponse> handleCooldown(CooldownExceededException ex) {
+        return build(HttpStatus.TOO_MANY_REQUESTS, "Too Many Requests",
+                ex.getMessage(), null, ex.getRetryAfterSeconds());
+    }
+
     // Spring Security throws this when the filter chain rejects a request
     // that lacks a valid token or permission.
     @ExceptionHandler(AccessDeniedException.class)
@@ -124,12 +133,17 @@ public class GlobalExceptionHandler {
     }
 
     private ResponseEntity<ApiErrorResponse> build(HttpStatus status, String error, String message, List<String> details) {
+        return build(status, error, message, details, null);
+    }
+
+    private ResponseEntity<ApiErrorResponse> build(HttpStatus status, String error, String message, List<String> details, Integer retryAfterSeconds) {
         ApiErrorResponse body = ApiErrorResponse.builder()
                 .timestamp(LocalDateTime.now())
                 .status(status.value())
                 .error(error)
                 .message(message)
                 .details(details)
+                .retryAfterSeconds(retryAfterSeconds)
                 .build();
         return ResponseEntity.status(status).body(body);
     }

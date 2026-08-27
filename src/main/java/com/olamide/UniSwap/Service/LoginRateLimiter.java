@@ -18,8 +18,13 @@ public class LoginRateLimiter {
 
     private static final int MAX_ATTEMPTS = 10;
     private static final long WINDOW_SECONDS = 15 * 60;
+    private static final long COOLDOWN_SECONDS = 30;
 
     private final Map<String, List<Long>> attempts = new ConcurrentHashMap<>();
+
+    // Tracks the last time a verification/reset code was sent per key (email),
+    // so clients can be throttled to one send per COOLDOWN_SECONDS.
+    private final Map<String, Long> lastCodeSend = new ConcurrentHashMap<>();
 
     // Records an attempt and returns true if it's still within budget for the
     // window, false if the caller has hit the cap and should be rejected.
@@ -35,5 +40,24 @@ public class LoginRateLimiter {
         }
         timestamps.add(now);
         return true;
+    }
+
+    // Returns how many seconds remain before the next code send for this key
+    // is allowed, or 0 if a send is permitted right now.
+    public long cooldownRemainingSeconds(String key) {
+        long elapsed = Instant.now().getEpochSecond() - lastCodeSend.getOrDefault(key, 0L);
+        if (elapsed >= COOLDOWN_SECONDS) {
+            return 0;
+        }
+        return COOLDOWN_SECONDS - elapsed;
+    }
+
+    // Records that a code was just sent for this key.
+    public void recordCodeSent(String key) {
+        lastCodeSend.put(key, Instant.now().getEpochSecond());
+    }
+
+    public long getCooldownSeconds() {
+        return COOLDOWN_SECONDS;
     }
 }
