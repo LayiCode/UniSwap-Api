@@ -70,6 +70,11 @@ management:
       enabled: false   # SMTP outages must not take /actuator/health DOWN
 
 app:
+  mail:
+    # Brevo transactional-email REST API key (xkeysib-...). When set (production),
+    # MailService sends over HTTPS (443) instead of SMTP — Render blocks outbound
+    # SMTP ports 465/587, so the REST API is the reliable delivery path.
+    brevo-api-key: ${BREVO_API_KEY:}
   upload:
     dir: ${UPLOAD_DIR:uploads}                       # Folder (relative to where the app runs) where images are saved
     base-url: ${APP_BASE_URL:http://localhost:8080/uploads}   # Public URL prefix for saved images
