@@ -7,7 +7,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.MailException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 // Sends transactional emails. Spring Boot only creates a JavaMailSender bean
@@ -40,10 +39,13 @@ public class MailService {
         return host != null && !host.isBlank();
     }
 
-    // Fire-and-forget on the mailExecutor pool: SMTP latency or outages must
-    // never block the HTTP request that triggered the send.
-    @Async("mailExecutor")
-    public void sendVerificationCode(String to, String code, VerificationPurpose purpose) {
+    // Attempts to email a verification code. Returns true when the message was
+    // handed to the SMTP relay (queued), false when delivery is impossible —
+    // no SMTP configured, the sender bean is missing, or the relay refused the
+    // message. Callers use the boolean to decide whether to surface the code in
+    // the response as a fallback: campus email is notoriously unreliable, and a
+    // stuck signup is worse than a code shown on screen.
+    public boolean sendVerificationCode(String to, String code, VerificationPurpose purpose) {
         String subject = switch (purpose) {
             case SIGNUP -> "Verify your UniSwap email";
             case LOGIN -> "Your UniSwap login code";
@@ -59,13 +61,13 @@ public class MailService {
         if (!isSmtpConfigured()) {
             // Dev mode: no SMTP configured, print the code so the flow is usable.
             log.warn("[DEV] Email verification for {} ({}): code {}", to, purpose, code);
-            return;
+            return false;
         }
 
         JavaMailSender sender = mailSenderProvider.getIfAvailable();
         if (sender == null) {
             log.warn("[DEV] Mail sender unavailable, email verification for {} ({}): code {}", to, purpose, code);
-            return;
+            return false;
         }
 
         try {
@@ -78,10 +80,12 @@ public class MailService {
             // Makes delivery attempts visible in production logs: if neither
             // this line nor the error below appears, the send never ran.
             log.info("Email queued via SMTP: to={}, purpose={}", to, purpose);
+            return true;
         } catch (MailException ex) {
             // Never fail the request because email delivery failed — the caller
             // (forgot-password/login-code) must not reveal whether the address exists.
             log.error("Failed to send email to {}", to, ex);
+            return false;
         }
     }
 }

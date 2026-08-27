@@ -53,13 +53,13 @@ class ReportControllerIntegrationTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated());
 
-        String signupCode = emailVerificationService.generateAndSendCode(email, VerificationPurpose.SIGNUP);
+        String signupCode = emailVerificationService.generateAndSendCode(email, VerificationPurpose.SIGNUP).code();
         mockMvc.perform(post("/api/auth/verify-email")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"" + email + "\",\"code\":\"" + signupCode + "\"}"))
                 .andExpect(status().isOk());
 
-        String loginCode = emailVerificationService.generateAndSendCode(email, VerificationPurpose.LOGIN);
+        String loginCode = emailVerificationService.generateAndSendCode(email, VerificationPurpose.LOGIN).code();
         String body = mockMvc.perform(post("/api/auth/login-code/verify")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"" + email + "\",\"code\":\"" + loginCode + "\"}"))

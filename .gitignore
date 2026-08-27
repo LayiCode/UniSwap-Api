@@ -36,6 +36,7 @@ build/
 # Locally uploaded product images �?" not part of the codebase, and this
 # folder won't exist on a fresh clone until the app runs and creates it.
 uploads/
+test-uploads/
 
 # Local run logs
 *.log

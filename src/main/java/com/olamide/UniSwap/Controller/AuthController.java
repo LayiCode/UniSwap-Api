@@ -1,6 +1,7 @@
 package com.olamide.UniSwap.Controller;
 
 import com.olamide.UniSwap.Dto.*;
+import com.olamide.UniSwap.Service.CodeDelivery;
 import com.olamide.UniSwap.Service.LoginRateLimiter;
 import com.olamide.UniSwap.Service.PasswordResetService;
 import com.olamide.UniSwap.Service.UserService;
@@ -69,14 +70,22 @@ public class AuthController {
 
     // Passwordless login, step 1: email a one-time code (if the address exists
     // and is verified — the response is identical otherwise, anti-enumeration).
+    // When the email can't be delivered the code is returned so the user isn't
+    // locked out; on a successful send no code is included in the response.
     @PostMapping("/login-code")
-    public ResponseEntity<Void> requestLoginCode(@Valid @RequestBody LoginCodeRequest request) {
+    public ResponseEntity<Map<String, Object>> requestLoginCode(@Valid @RequestBody LoginCodeRequest request) {
         if (!loginRateLimiter.isAllowed("login-code:" + UserService.normalizeEmail(request.getEmail()))) {
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
                     "Too many code requests. Please try again in a few minutes.");
         }
-        userService.requestLoginCode(request.getEmail());
-        return ResponseEntity.ok().build();
+        CodeDelivery delivery = userService.requestLoginCode(request.getEmail());
+        Map<String, Object> body = new java.util.HashMap<>();
+        // Null value (unknown/unverified address, or a successful send) is
+        // omitted rather than included-as-null so anti-enumeration holds.
+        if (delivery != null && !delivery.delivered()) {
+            body.put("verificationCode", delivery.code());
+        }
+        return ResponseEntity.ok(body);
     }
 
     // Passwordless login, step 2: exchange the emailed code for a JWT.
@@ -108,15 +117,20 @@ public class AuthController {
 
     // Re-sends the signup code for an account that hasn't been verified yet.
     // Silent (200) whether or not such an account exists, so callers can't
-    // probe registered-but-unverified emails.
+    // probe registered-but-unverified emails. The code is returned (only) when
+    // email delivery failed, so the user can still complete verification.
     @PostMapping("/resend-verification-code")
-    public ResponseEntity<Void> resendVerificationCode(@Valid @RequestBody LoginCodeRequest request) {
+    public ResponseEntity<Map<String, Object>> resendVerificationCode(@Valid @RequestBody LoginCodeRequest request) {
         if (!loginRateLimiter.isAllowed("resend:" + UserService.normalizeEmail(request.getEmail()))) {
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
                     "Too many resend requests. Please try again in a few minutes.");
         }
-        userService.resendSignupCode(request.getEmail());
-        return ResponseEntity.ok().build();
+        CodeDelivery delivery = userService.resendSignupCode(request.getEmail());
+        Map<String, Object> body = new java.util.HashMap<>();
+        if (delivery != null && !delivery.delivered()) {
+            body.put("verificationCode", delivery.code());
+        }
+        return ResponseEntity.ok(body);
     }
 
     @GetMapping("/config")

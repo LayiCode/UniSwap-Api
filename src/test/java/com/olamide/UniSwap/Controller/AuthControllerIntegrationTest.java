@@ -80,7 +80,7 @@ class AuthControllerIntegrationTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated());
 
-        String signupCode = emailVerificationService.generateAndSendCode(email, VerificationPurpose.SIGNUP);
+        String signupCode = emailVerificationService.generateAndSendCode(email, VerificationPurpose.SIGNUP).code();
         mockMvc.perform(post("/api/auth/verify-email")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"" + email + "\",\"code\":\"" + signupCode + "\"}"))
@@ -181,7 +181,7 @@ class AuthControllerIntegrationTest {
                         .content(objectMapper.writeValueAsString(validRegisterRequest())));
 
         String code = emailVerificationService.generateAndSendCode(
-                "olamide@student.lautech.edu.ng", VerificationPurpose.SIGNUP);
+                "olamide@student.lautech.edu.ng", VerificationPurpose.SIGNUP).code();
 
         mockMvc.perform(post("/api/auth/verify-email")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -214,7 +214,7 @@ class AuthControllerIntegrationTest {
                 .andExpect(status().isOk());
 
         String loginCode = emailVerificationService.generateAndSendCode(
-                "loginuser@example.com", VerificationPurpose.LOGIN);
+                "loginuser@example.com", VerificationPurpose.LOGIN).code();
 
         mockMvc.perform(post("/api/auth/login-code/verify")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -304,7 +304,7 @@ class AuthControllerIntegrationTest {
                 .content(objectMapper.writeValueAsString(validRegisterRequest())));
 
         String loginCode = emailVerificationService.generateAndSendCode(
-                "olamide@student.lautech.edu.ng", VerificationPurpose.LOGIN);
+                "olamide@student.lautech.edu.ng", VerificationPurpose.LOGIN).code();
 
         mockMvc.perform(post("/api/auth/login-code/verify")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -316,7 +316,7 @@ class AuthControllerIntegrationTest {
     void loginWithCode_returns401_whenCodeIsWrong() throws Exception {
         registerAndVerify("wrongcode", "wrongcode@example.com");
 
-        emailVerificationService.generateAndSendCode("wrongcode@example.com", VerificationPurpose.LOGIN);
+        emailVerificationService.generateAndSendCode("wrongcode@example.com", VerificationPurpose.LOGIN).code();
 
         mockMvc.perform(post("/api/auth/login-code/verify")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -364,7 +364,7 @@ class AuthControllerIntegrationTest {
                 .andExpect(status().isOk());
 
         String resetCode = emailVerificationService.generateAndSendCode(
-                "resetuser@example.com", VerificationPurpose.RESET);
+                "resetuser@example.com", VerificationPurpose.RESET).code();
 
         ResetPasswordRequest reset = ResetPasswordRequest.builder()
                 .email("resetuser@example.com")
@@ -435,14 +435,14 @@ class AuthControllerIntegrationTest {
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated());
         String signupCode = emailVerificationService.generateAndSendCode(
-                "similarreset@example.com", VerificationPurpose.SIGNUP);
+                "similarreset@example.com", VerificationPurpose.SIGNUP).code();
         mockMvc.perform(post("/api/auth/verify-email")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"email\":\"similarreset@example.com\",\"code\":\"" + signupCode + "\"}"))
                 .andExpect(status().isOk());
 
         String resetCode = emailVerificationService.generateAndSendCode(
-                "similarreset@example.com", VerificationPurpose.RESET);
+                "similarreset@example.com", VerificationPurpose.RESET).code();
 
         ResetPasswordRequest reset = ResetPasswordRequest.builder()
                 .email("similarreset@example.com")

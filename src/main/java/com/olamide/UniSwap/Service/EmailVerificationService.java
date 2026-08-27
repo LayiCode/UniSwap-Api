@@ -34,11 +34,11 @@ public class EmailVerificationService {
         this.codeTtlMinutes = codeTtlMinutes;
     }
 
-    // Issues a fresh 6-digit code for an address+purpose and emails it. Returns
-    // the raw code so tests (and internal callers) can inspect it — never expose
-    // it through a controller.
+    // Issues a fresh 6-digit code for an address+purpose, emails it, and
+    // reports on delivery. The delivered flag lets callers fall back to showing
+    // the code on screen when the email can't be sent.
     @Transactional
-    public String generateAndSendCode(String email, VerificationPurpose purpose) {
+    public CodeDelivery generateAndSendCode(String email, VerificationPurpose purpose) {
         String normalized = UserService.normalizeEmail(email);
 
         // Only the most recent code per address+purpose should be usable.
@@ -55,8 +55,8 @@ public class EmailVerificationService {
                 .build();
         codeRepository.save(code);
 
-        mailService.sendVerificationCode(normalized, rawCode, purpose);
-        return rawCode;
+        boolean delivered = mailService.sendVerificationCode(normalized, rawCode, purpose);
+        return new CodeDelivery(rawCode, delivered);
     }
 
     // Validates AND consumes a code: returns true only once, and a wrong guess

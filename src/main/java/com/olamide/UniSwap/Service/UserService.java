@@ -54,11 +54,16 @@ public class UserService {
 
         User saved = userRepository.save(user);
 
-        emailVerificationService.generateAndSendCode(saved.getEmail(), VerificationPurpose.SIGNUP);
+        CodeDelivery delivery = emailVerificationService.generateAndSendCode(saved.getEmail(), VerificationPurpose.SIGNUP);
+
+        String message = delivery.delivered()
+                ? "Account created. Check your email for the verification code to activate your login."
+                : "Account created. We couldn't email your verification code, so it's shown below.";
 
         return RegisterResponse.builder()
                 .user(UserResponseDTO.fromEntity(saved))
-                .message("Account created. Check your email for the verification code to activate your login.")
+                .message(message)
+                .verificationCode(delivery.delivered() ? null : delivery.code())
                 .build();
     }
 
@@ -105,27 +110,29 @@ public class UserService {
     }
 
     @Transactional
-    public void resendSignupCode(String email) {
+    public CodeDelivery resendSignupCode(String email) {
         String normalized = normalizeEmail(email);
         User user = userRepository.findByEmail(normalized).orElse(null);
         if (user == null || user.isEmailVerified()) {
             // Same response for unknown and already-verified accounts
             // (anti-enumeration).
-            return;
+            return null;
         }
-        emailVerificationService.generateAndSendCode(normalized, VerificationPurpose.SIGNUP);
+        return emailVerificationService.generateAndSendCode(normalized, VerificationPurpose.SIGNUP);
     }
 
-    // Passwordless login step 1: email a one-time code to the address.
+    // Passwordless login step 1: email a one-time code to the address. Returns
+    // the delivery result when a code was generated, or null for an unknown /
+    // unverified address (same null for both, anti-enumeration).
     @Transactional
-    public void requestLoginCode(String email) {
+    public CodeDelivery requestLoginCode(String email) {
         String normalized = normalizeEmail(email);
         User user = userRepository.findByEmail(normalized).orElse(null);
         if (user == null || !user.isEmailVerified()) {
             // Same response for unknown and unverified accounts (anti-enumeration).
-            return;
+            return null;
         }
-        emailVerificationService.generateAndSendCode(normalized, VerificationPurpose.LOGIN);
+        return emailVerificationService.generateAndSendCode(normalized, VerificationPurpose.LOGIN);
     }
 
     // Passwordless login step 2: exchange the code for a JWT.

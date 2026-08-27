@@ -67,6 +67,8 @@ class UserServiceTest {
             u.setId(1L);
             return u;
         });
+        when(emailVerificationService.generateAndSendCode(anyString(), any()))
+                .thenReturn(new CodeDelivery("123456", true));
 
         RegisterResponse response = userService.register(registerRequest);
 
