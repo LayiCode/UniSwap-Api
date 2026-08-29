@@ -38,6 +38,14 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     @EntityGraph(attributePaths = "seller")
     Page<Product> findBySellerId(Long sellerId, Pageable pageable);
 
+    @EntityGraph(attributePaths = "seller")
+    Page<Product> findBySellerIdAndStatus(Long sellerId, ProductStatus status, Pageable pageable);
+
+    // Count of a user's listings in a given lifecycle state. Used for the
+    // "active listings" count on a public profile.
+    @Query("select count(p) from Product p where p.seller.id = :sellerId and p.status = :status")
+    long countBySellerIdAndStatus(@Param("sellerId") Long sellerId, @Param("status") ProductStatus status);
+
     // Join-fetch seller AND photos for single lookups, so ProductDTO mapping
     // in the controller never triggers a lazy load (which would throw once
     // open-in-view is disabled). @OrderBy on Product.images sorts them.
