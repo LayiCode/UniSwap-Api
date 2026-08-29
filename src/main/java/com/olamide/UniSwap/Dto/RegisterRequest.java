@@ -42,7 +42,7 @@ public class RegisterRequest {
     // and require a plausible 10-14 digit core rather than rejecting a valid
     // address with a strict pattern.
     @NotBlank(message = "Phone number is required")
-    @Pattern(regexp = "^\\+?[0-9][0-9()\\-\\s]{9,17}[0-9]$",
+    @Pattern(regexp = "^\\+?[0-9][0-9()\\-\\s]{6,17}[0-9]$",
             message = "Phone number must be a valid number")
     private String phoneNumber;
 }
