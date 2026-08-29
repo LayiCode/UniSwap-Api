@@ -53,6 +53,7 @@ public class ProductService {
                 .category(dto.getCategory())
                 .itemCondition(dto.getItemCondition())
                 .imageUrl(dto.getImageUrl())
+                .location(dto.getLocation())
                 .seller(seller)
                 .build();
         // status is deliberately not taken from the DTO — @PrePersist on
@@ -89,6 +90,14 @@ public class ProductService {
         return productRepository.findBySellerId(sellerId, pageable);
     }
 
+    // Public view of a user's profile page: only their currently-available
+    // listings, so a buyer browsing a seller's profile only sees what they can
+    // actually buy right now.
+    @Transactional(readOnly = true)
+    public Page<Product> getAvailableBySeller(Long sellerId, Pageable pageable) {
+        return productRepository.findBySellerIdAndStatus(sellerId, ProductStatus.AVAILABLE, pageable);
+    }
+
     @Transactional(readOnly = true)
     public Product getById(Long id) {
         return productRepository.findByIdWithSeller(id)
@@ -106,6 +115,7 @@ public class ProductService {
         product.setPrice(dto.getPrice());
         product.setCategory(dto.getCategory());
         product.setItemCondition(dto.getItemCondition());
+        product.setLocation(dto.getLocation());
         // imageUrl/images are deliberately NOT taken from the DTO — the lean
         // frontend payload never carries them, and copying a null here would
         // silently detach every photo from the listing. Photos are managed
