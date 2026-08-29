@@ -2,13 +2,16 @@ package com.olamide.UniSwap.Service;
 
 import com.olamide.UniSwap.Config.UserPrincipal;
 import com.olamide.UniSwap.Dto.*;
+import com.olamide.UniSwap.Entity.ProductStatus;
 import com.olamide.UniSwap.Entity.User;
+import com.olamide.UniSwap.Repository.ProductRepository;
 import com.olamide.UniSwap.Repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Locale;
@@ -19,9 +22,11 @@ import java.util.UUID;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final ProductRepository productRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final EmailVerificationService emailVerificationService;
+    private final FileStorageService fileStorageService;
 
     // Creates the account (emailVerified=false) and emails a signup code.
     // Login is locked until /auth/verify-email confirms the code.
@@ -35,7 +40,7 @@ public class UserService {
         // placeholder so the user can sign up now and pick a real name later.
         String username = request.getUsername() == null ? "" : request.getUsername().trim();
         String password = request.getPassword();
-        String phoneNumber = request.getPhoneNumber() == null ? "" : request.getPhoneNumber().trim();
+        String phoneNumber = normalizePhone(request.getPhoneNumber());
 
         validateCredentials(username, password, null);
 
@@ -160,6 +165,46 @@ public class UserService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
     }
 
+    // Updates only the profile fields the caller actually provided. Null means
+    // "leave unchanged", so partial updates never wipe a value the client
+    // didn't send.
+    @Transactional
+    public User updateProfile(Long id, UpdateProfileRequest request) {
+        User user = getById(id);
+        if (request.getDisplayName() != null) {
+            user.setDisplayName(request.getDisplayName().trim());
+        }
+        if (request.getBio() != null) {
+            user.setBio(request.getBio().trim());
+        }
+        if (request.getLocation() != null) {
+            user.setLocation(request.getLocation().trim());
+        }
+        return userRepository.save(user);
+    }
+
+    // Replaces the current avatar with a freshly uploaded image (reusing the
+    // same magic-byte-validated storage path as product photos). The previous
+    // avatar file is best-effort deleted when it's no longer referenced.
+    @Transactional
+    public User uploadAvatar(Long id, MultipartFile file) {
+        User user = getById(id);
+        String oldAvatar = user.getAvatarUrl();
+        String newAvatar = fileStorageService.store(file);
+        user.setAvatarUrl(newAvatar);
+        User saved = userRepository.save(user);
+        if (oldAvatar != null && !oldAvatar.equals(newAvatar)) {
+            fileStorageService.delete(oldAvatar);
+        }
+        return saved;
+    }
+
+    // Number of listings the user currently has live (status AVAILABLE). Used
+    // to show an "active listings" count on a public profile.
+    public long countActiveListings(Long userId) {
+        return productRepository.countBySellerIdAndStatus(userId, ProductStatus.AVAILABLE);
+    }
+
     // Google sign-in: reuse an existing account if the verified email is
     // already registered, otherwise provision one. The password is a random
     // value that will never be used — Google is the only way in for these
@@ -239,5 +284,19 @@ public class UserService {
 
     public static String normalizeEmail(String email) {
         return email == null ? null : email.trim().toLowerCase(Locale.ROOT);
+    }
+
+    // Normalize a phone number to a compact digits-only form so equivalent
+    // formats are stored consistently: "+234 801 234 5678", "+234-801-234-5678"
+    // and "08012345678" all become their plain digit string. The leading "+"
+    // is dropped but the national 234 (or the leading 0) is preserved exactly
+    // as the user typed it. An input that contains no digits at all is kept as
+    // the trimmed original (so the DTO @Pattern still has a chance to reject it).
+    static String normalizePhone(String phone) {
+        if (phone == null || phone.isBlank()) {
+            return phone == null ? null : phone.trim();
+        }
+        String digits = phone.replaceAll("[^0-9]", "");
+        return digits.isEmpty() ? phone.trim() : digits;
     }
 }
