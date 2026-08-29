@@ -123,6 +123,31 @@ class UserServiceTest {
     }
 
     @Test
+    void normalizePhone_stripsSeparatorsAndLeadingPlus() {
+        assertThat(UserService.normalizePhone("+234 801 234 5678")).isEqualTo("2348012345678");
+        assertThat(UserService.normalizePhone("+234-801-234-5678")).isEqualTo("2348012345678");
+        assertThat(UserService.normalizePhone("+2348012345678")).isEqualTo("2348012345678");
+        assertThat(UserService.normalizePhone("08012345678")).isEqualTo("08012345678");
+        assertThat(UserService.normalizePhone("+234 (801) 234 5678")).isEqualTo("2348012345678");
+        assertThat(UserService.normalizePhone("  +2348012345678  ")).isEqualTo("2348012345678");
+    }
+
+    @Test
+    void register_storesNormalizedInternationalPhone() {
+        registerRequest.setPhoneNumber("+234 801 234 5678");
+        when(userRepository.existsByEmail(anyString())).thenReturn(false);
+        when(userRepository.existsByUsername(anyString())).thenReturn(false);
+        when(passwordEncoder.encode(anyString())).thenReturn("hashed-password");
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(emailVerificationService.generateAndSendCode(anyString(), any()))
+                .thenReturn(new CodeDelivery("123456", true));
+
+        RegisterResponse response = userService.register(registerRequest);
+
+        assertThat(response.getUser().getPhoneNumber()).isEqualTo("2348012345678");
+    }
+
+    @Test
     void verifyEmail_marksAccountVerified_whenCodeValid() {
         User user = User.builder()
                 .id(1L)
