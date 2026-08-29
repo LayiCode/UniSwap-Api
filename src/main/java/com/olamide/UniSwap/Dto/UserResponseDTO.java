@@ -23,6 +23,10 @@ public class UserResponseDTO {
     private String username;
     private String email;
     private String phoneNumber;
+    private String displayName;
+    private String avatarUrl;
+    private String bio;
+    private String location;
     private boolean emailVerified;
     private boolean admin;
     private LocalDateTime createdAt;
@@ -33,6 +37,10 @@ public class UserResponseDTO {
                 .username(user.getUsername())
                 .email(user.getEmail())
                 .phoneNumber(user.getPhoneNumber())
+                .displayName(user.getDisplayName())
+                .avatarUrl(user.getAvatarUrl())
+                .bio(user.getBio())
+                .location(user.getLocation())
                 .emailVerified(user.isEmailVerified())
                 .admin(user.isAdmin())
                 .createdAt(user.getCreatedAt())
