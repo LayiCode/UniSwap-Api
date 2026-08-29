@@ -46,6 +46,9 @@ public class ProductDTO {
     @Size(max = 50, message = "Condition must be at most 50 characters")
     private String itemCondition;
 
+    @Size(max = 120, message = "Location must be at most 120 characters")
+    private String location;
+
     // Read-only from the client's perspective: the service never copies this
     // onto the entity on create/update, and on the way out it carries the
     // server-authoritative status as a string ("AVAILABLE"/"SOLD").
@@ -62,6 +65,10 @@ public class ProductDTO {
     private Long sellerId;
 
     private String sellerUsername;
+
+    private String sellerDisplayName;
+
+    private String sellerAvatarUrl;
 
     private LocalDateTime createdAt;
 
@@ -95,11 +102,17 @@ public class ProductDTO {
                 .imageUrls(coverAndGallery(product))
                 .sellerId(product.getSeller().getId())
                 .sellerUsername(product.getSeller().getUsername())
+                .sellerDisplayName(firstNonBlank(product.getSeller().getDisplayName(), product.getSeller().getUsername()))
+                .sellerAvatarUrl(product.getSeller().getAvatarUrl())
+                .location(product.getLocation())
                 .createdAt(product.getCreatedAt())
                 .favorited(favorited)
                 .build();
     }
 
+    private static String firstNonBlank(String a, String b) {
+        return a == null || a.isBlank() ? b : a;
+    }
     // Reading the lazy images collection is only legal when it was fetched
     // with the product (detail path); touching an uninitialized collection
     // after the session closed would throw. Legacy listings with a cover but
