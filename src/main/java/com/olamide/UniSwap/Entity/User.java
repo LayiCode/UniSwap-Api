@@ -32,6 +32,24 @@ public class User {
     @Column(name = "phone_number", nullable = false)
     private String phoneNumber;
 
+    // Human-friendly name shown on listings, chat, and profiles. Falls back to
+    // username when unset.
+    @Column(name = "display_name")
+    private String displayName;
+
+    // Public avatar URL (Supabase storage). Never accepted from the client by
+    // value — avatar uploads go through the POST /users/me/avatar endpoint.
+    @Column(name = "avatar_url")
+    private String avatarUrl;
+
+    @Column(length = 500)
+    private String bio;
+
+    // Free-text default location used to prefill new listings and shown on a
+    // user's public profile.
+    @Column(length = 120)
+    private String location;
+
     // New accounts must confirm their email with a code before they can log in.
     // OAuth users are verified implicitly by the identity provider.
     @Column(name = "email_verified", nullable = false)
