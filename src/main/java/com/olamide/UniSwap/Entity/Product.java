@@ -51,6 +51,11 @@ public class Product {
     @Column(nullable = false)
     private ProductStatus status; // "AVAILABLE" or "SOLD"
 
+    // Free-text pickup/meetup location for this listing, e.g. "North Gate,
+    // LAUTECH". Optional and unstructured for now.
+    @Column(name = "location", length = 120)
+    private String location;
+
     @Column(name = "image_url")
     private String imageUrl;
 
