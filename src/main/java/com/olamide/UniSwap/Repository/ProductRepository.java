@@ -21,6 +21,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     // service, and it matches BOTH title and description.
     @EntityGraph(attributePaths = "seller")
     @Query("select p from Product p where p.status = :status " +
+            "and p.seller.deletedAt is null " +
             "and (:keyword is null or lower(p.title) like :keyword or lower(p.description) like :keyword) " +
             "and (:category is null or p.category = :category) " +
             "and (:condition is null or p.itemCondition = :condition) " +

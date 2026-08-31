@@ -86,6 +86,14 @@ public class UserController {
                 .toList()));
     }
 
+    // Soft-deletes the authenticated user's own account: anonymizes the email/
+    // username, hides the profile and any listings, and prevents further login.
+    @DeleteMapping("/me")
+    public ResponseEntity<Void> deleteMyAccount(@AuthenticationPrincipal UserPrincipal principal) {
+        userService.deactivate(requireId(principal));
+        return ResponseEntity.noContent().build();
+    }
+
     private Long requireId(UserPrincipal principal) {
         if (principal == null || principal.getId() == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required");

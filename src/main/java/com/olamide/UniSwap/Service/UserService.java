@@ -14,6 +14,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Locale;
 import java.util.UUID;
 
@@ -161,8 +163,36 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public User getById(Long id) {
-        return userRepository.findById(id)
+        User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        if (user.isDeleted()) {
+            // A deleted (soft-deleted) account is indistinguishable from one
+            // that never existed — hides the profile, blocks messaging, etc.
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found");
+        }
+        return user;
+    }
+
+    // Soft-delete the account: keep the row (preserving FK integrity for
+    // chat/purchase/report history) but mark it deleted and anonymize the
+    // email + username so the original identifiers become free to re-register.
+    // The anonymized email never matches login lookups, so the account can't
+    // be signed into again.
+    @Transactional
+    public void deactivate(Long id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        if (user.isDeleted()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Account is already deleted");
+        }
+        user.setDeletedAt(LocalDateTime.now(ZoneOffset.UTC));
+        user.setEmail("deleted-" + id + "@local.invalid");
+        user.setUsername("deleted-user-" + id);
+        user.setDisplayName(null);
+        user.setAvatarUrl(null);
+        user.setBio(null);
+        user.setLocation(null);
+        userRepository.save(user);
     }
 
     // Updates only the profile fields the caller actually provided. Null means

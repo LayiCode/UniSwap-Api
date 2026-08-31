@@ -100,8 +100,13 @@ public class ProductService {
 
     @Transactional(readOnly = true)
     public Product getById(Long id) {
-        return productRepository.findByIdWithSeller(id)
+        Product product = productRepository.findByIdWithSeller(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found"));
+        if (product.getSeller() != null && product.getSeller().isDeleted()) {
+            // A deleted seller's listing no longer exists publicly.
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found");
+        }
+        return product;
     }
 
     @Transactional

@@ -50,6 +50,13 @@ public class User {
     @Column(length = 120)
     private String location;
 
+    // Soft-delete marker: null means the account is active. When an account is
+    // deleted we keep the row (for FK integrity with chat/purchase/report
+    // history) but set this timestamp, anonymize the email/username, and hide
+    // the profile + listings. Non-null blocks login and public exposure.
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
     // New accounts must confirm their email with a code before they can log in.
     // OAuth users are verified implicitly by the identity provider.
     @Column(name = "email_verified", nullable = false)
@@ -70,6 +77,10 @@ public class User {
     // silently destroy a seller's listings via cascade.
     @OneToMany(mappedBy = "seller", fetch = FetchType.LAZY)
     private List<Product> products;
+
+    public boolean isDeleted() {
+        return deletedAt != null;
+    }
 
     @PrePersist
     protected void onCreate() {
