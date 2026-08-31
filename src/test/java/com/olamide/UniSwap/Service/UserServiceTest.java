@@ -292,4 +292,71 @@ class UserServiceTest {
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("Invalid email or code");
     }
+
+    @Test
+    void deactivate_anonymizesIdentityAndMarksDeleted() {
+        User user = User.builder()
+                .id(7L)
+                .username("olamide")
+                .email("olamide@student.lautech.edu.ng")
+                .displayName("Olamide")
+                .avatarUrl("https://x/y.png")
+                .bio("hi")
+                .location("North Gate")
+                .build();
+        when(userRepository.findById(7L)).thenReturn(Optional.of(user));
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        userService.deactivate(7L);
+
+        assertThat(user.isDeleted()).isTrue();
+        assertThat(user.getDeletedAt()).isNotNull();
+        // Original identity must be freed so it can be re-registered.
+        assertThat(user.getEmail()).isEqualTo("deleted-7@local.invalid");
+        assertThat(user.getUsername()).isEqualTo("deleted-user-7");
+        // Profile fields cleared.
+        assertThat(user.getDisplayName()).isNull();
+        assertThat(user.getAvatarUrl()).isNull();
+        assertThat(user.getBio()).isNull();
+        assertThat(user.getLocation()).isNull();
+        verify(userRepository).save(user);
+    }
+
+    @Test
+    void deactivate_throwsBadRequest_whenAlreadyDeleted() {
+        User user = User.builder()
+                .id(7L)
+                .email("deleted-7@local.invalid")
+                .deletedAt(java.time.LocalDateTime.now())
+                .build();
+        when(userRepository.findById(7L)).thenReturn(Optional.of(user));
+
+        assertThatThrownBy(() -> userService.deactivate(7L))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("already deleted");
+
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void getById_hidesDeletedAccount() {
+        User user = User.builder()
+                .id(7L)
+                .email("deleted-7@local.invalid")
+                .deletedAt(java.time.LocalDateTime.now())
+                .build();
+        when(userRepository.findById(7L)).thenReturn(Optional.of(user));
+
+        assertThatThrownBy(() -> userService.getById(7L))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("User not found");
+    }
+
+    @Test
+    void getById_returnsUser_whenActive() {
+        User user = User.builder().id(7L).username("olamide").build();
+        when(userRepository.findById(7L)).thenReturn(Optional.of(user));
+
+        assertThat(userService.getById(7L).getUsername()).isEqualTo("olamide");
+    }
 }
