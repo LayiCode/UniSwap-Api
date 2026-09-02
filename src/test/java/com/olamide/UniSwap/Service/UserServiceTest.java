@@ -1,8 +1,10 @@
 package com.olamide.UniSwap.Service;
 
 import com.olamide.UniSwap.Dto.AuthResponseDTO;
+import com.olamide.UniSwap.Dto.ChangePasswordRequest;
 import com.olamide.UniSwap.Dto.RegisterRequest;
 import com.olamide.UniSwap.Dto.RegisterResponse;
+import com.olamide.UniSwap.Dto.UpdateProfileRequest;
 import com.olamide.UniSwap.Entity.User;
 import com.olamide.UniSwap.Repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -358,5 +360,83 @@ class UserServiceTest {
         when(userRepository.findById(7L)).thenReturn(Optional.of(user));
 
         assertThat(userService.getById(7L).getUsername()).isEqualTo("olamide");
+    }
+
+    @Test
+    void updateProfile_updatesUsernameAndPhone_whenProvided() {
+        User user = User.builder().id(7L).username("olamide").phoneNumber("08012345678")
+                .displayName("O").bio("b").location("L").build();
+        when(userRepository.findById(7L)).thenReturn(Optional.of(user));
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UpdateProfileRequest request = UpdateProfileRequest.builder()
+                .username("  newhandle  ")
+                .phoneNumber("+234 801 234 5678")
+                .build();
+
+        userService.updateProfile(7L, request);
+
+        assertThat(user.getUsername()).isEqualTo("newhandle");
+        assertThat(user.getPhoneNumber()).isEqualTo("2348012345678");
+        // Untouched fields must be preserved.
+        assertThat(user.getDisplayName()).isEqualTo("O");
+        assertThat(user.getBio()).isEqualTo("b");
+        assertThat(user.getLocation()).isEqualTo("L");
+        verify(userRepository).save(user);
+    }
+
+    @Test
+    void updateProfile_keepsUsername_whenBlankOrNull() {
+        User user = User.builder().id(7L).username("olamide").phoneNumber("08012345678").build();
+        when(userRepository.findById(7L)).thenReturn(Optional.of(user));
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        userService.updateProfile(7L, UpdateProfileRequest.builder().username("   ").build());
+        assertThat(user.getUsername()).isEqualTo("olamide");
+
+        userService.updateProfile(7L, UpdateProfileRequest.builder().build());
+        assertThat(user.getUsername()).isEqualTo("olamide");
+        assertThat(user.getPhoneNumber()).isEqualTo("08012345678");
+    }
+
+    @Test
+    void changePassword_encodesNewPassword_whenCurrentPasswordMatches() {
+        User user = User.builder().id(7L).username("olamide")
+                .password("encoded-old").build();
+        when(userRepository.findById(7L)).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("old123", "encoded-old")).thenReturn(true);
+        when(passwordEncoder.matches("newpass123", "encoded-old")).thenReturn(false);
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ChangePasswordRequest request = ChangePasswordRequest.builder()
+                .currentPassword("old123")
+                .newPassword("newpass123")
+                .build();
+
+        userService.changePassword(7L, request);
+
+        verify(userRepository).save(user);
+        // The stored password must be the new hash, never the raw input.
+        verify(passwordEncoder).encode("newpass123");
+    }
+
+    @Test
+    void changePassword_throwsBadRequest_whenCurrentPasswordWrong() {
+        User user = User.builder().id(7L).username("olamide")
+                .password("encoded-old").build();
+        when(userRepository.findById(7L)).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("wrong", "encoded-old")).thenReturn(false);
+
+        ChangePasswordRequest request = ChangePasswordRequest.builder()
+                .currentPassword("wrong")
+                .newPassword("newpass123")
+                .build();
+
+        assertThatThrownBy(() -> userService.changePassword(7L, request))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Current password is incorrect");
+
+        verify(userRepository, never()).save(any());
+        verify(passwordEncoder, never()).encode(anyString());
     }
 }
