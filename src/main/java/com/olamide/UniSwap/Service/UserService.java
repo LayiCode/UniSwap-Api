@@ -197,10 +197,23 @@ public class UserService {
 
     // Updates only the profile fields the caller actually provided. Null means
     // "leave unchanged", so partial updates never wipe a value the client
-    // didn't send.
+    // didn't send. Username is optional and NOT uniqueness-checked here (that
+    // only happens at signup); a blank username means "keep the current".
     @Transactional
     public User updateProfile(Long id, UpdateProfileRequest request) {
         User user = getById(id);
+        if (request.getUsername() != null) {
+            String username = request.getUsername().trim();
+            if (!username.isBlank()) {
+                user.setUsername(username);
+            }
+        }
+        if (request.getPhoneNumber() != null) {
+            String phone = normalizePhone(request.getPhoneNumber());
+            if (phone != null && !phone.isBlank()) {
+                user.setPhoneNumber(phone);
+            }
+        }
         if (request.getDisplayName() != null) {
             user.setDisplayName(request.getDisplayName().trim());
         }
@@ -210,6 +223,21 @@ public class UserService {
         if (request.getLocation() != null) {
             user.setLocation(request.getLocation().trim());
         }
+        return userRepository.save(user);
+    }
+
+    // Changes the current user's password. Requires the current password to
+    // match (proves the caller knows the account secret), and reuses the same
+    // password-quality rules as register/reset (length, not identical to the
+    // current one, not similar to the username).
+    @Transactional
+    public User changePassword(Long id, ChangePasswordRequest request) {
+        User user = getById(id);
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Current password is incorrect");
+        }
+        validateCredentials(user.getUsername(), request.getNewPassword(), user.getPassword());
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
         return userRepository.save(user);
     }
 

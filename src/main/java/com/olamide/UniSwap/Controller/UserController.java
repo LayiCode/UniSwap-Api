@@ -1,6 +1,7 @@
 package com.olamide.UniSwap.Controller;
 
 import com.olamide.UniSwap.Config.UserPrincipal;
+import com.olamide.UniSwap.Dto.ChangePasswordRequest;
 import com.olamide.UniSwap.Dto.PageResponseDTO;
 import com.olamide.UniSwap.Dto.ProductDTO;
 import com.olamide.UniSwap.Dto.PublicUserResponseDTO;
@@ -57,6 +58,16 @@ public class UserController {
             @RequestParam("file") MultipartFile file,
             @AuthenticationPrincipal UserPrincipal principal) {
         User user = userService.uploadAvatar(requireId(principal), file);
+        return ResponseEntity.ok(UserResponseDTO.fromEntity(user));
+    }
+
+    // Changes the current user's password. Requires the current password in the
+    // body; returns the (unchanged) profile so the client can refresh.
+    @PatchMapping("/me/password")
+    public ResponseEntity<UserResponseDTO> changePassword(
+            @Valid @RequestBody ChangePasswordRequest request,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        User user = userService.changePassword(requireId(principal), request);
         return ResponseEntity.ok(UserResponseDTO.fromEntity(user));
     }
 

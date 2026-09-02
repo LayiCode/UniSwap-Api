@@ -1,5 +1,6 @@
 package com.olamide.UniSwap.Dto;
 
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -16,6 +17,16 @@ import lombok.Setter;
 @AllArgsConstructor
 @Builder
 public class UpdateProfileRequest {
+
+    // Username is optional and NOT uniqueness-checked here (that only happens
+    // at signup). Blank is treated by the service as "keep the current".
+    @Size(min = 3, max = 30, message = "Username must be between 3 and 30 characters")
+    private String username;
+
+    @Size(max = 20, message = "Phone number must be at most 20 characters")
+    @Pattern(regexp = "^\\+?[0-9][0-9()\\-\\s]{6,17}[0-9]$",
+            message = "Phone number must be a valid number")
+    private String phoneNumber;
 
     @Size(max = 60, message = "Display name must be at most 60 characters")
     private String displayName;
