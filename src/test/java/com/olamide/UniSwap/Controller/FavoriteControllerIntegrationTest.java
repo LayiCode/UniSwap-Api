@@ -95,7 +95,7 @@ class FavoriteControllerIntegrationTest {
 
     @Test
     void add_thenList_returnsTheFavoritedProduct() throws Exception {
-        String token = registerAndGetToken("favor1", "favor1@student.lautech.edu.ng");
+        String token = registerAndGetToken("favor1", "favor1@email.com");
         long productId = createProduct(token);
 
         mockMvc.perform(post("/api/favorites/{id}", productId)
@@ -112,8 +112,8 @@ class FavoriteControllerIntegrationTest {
 
     @Test
     void favorites_areIsolatedPerUser() throws Exception {
-        String ownerToken = registerAndGetToken("favor2a", "favor2a@student.lautech.edu.ng");
-        String otherToken = registerAndGetToken("favor2b", "favor2b@student.lautech.edu.ng");
+        String ownerToken = registerAndGetToken("favor2a", "favor2a@email.com");
+        String otherToken = registerAndGetToken("favor2b", "favor2b@email.com");
         long productId = createProduct(ownerToken);
 
         mockMvc.perform(post("/api/favorites/{id}", productId)
@@ -129,7 +129,7 @@ class FavoriteControllerIntegrationTest {
 
     @Test
     void addDuplicate_isRejected_withConflict() throws Exception {
-        String token = registerAndGetToken("favor3", "favor3@student.lautech.edu.ng");
+        String token = registerAndGetToken("favor3", "favor3@email.com");
         long productId = createProduct(token);
 
         mockMvc.perform(post("/api/favorites/{id}", productId)
@@ -142,7 +142,7 @@ class FavoriteControllerIntegrationTest {
 
     @Test
     void addFavorite_forUnknownProduct_returnsNotFound() throws Exception {
-        String token = registerAndGetToken("favor4", "favor4@student.lautech.edu.ng");
+        String token = registerAndGetToken("favor4", "favor4@email.com");
 
         mockMvc.perform(post("/api/favorites/999999")
                         .header("Authorization", "Bearer " + token))
@@ -151,7 +151,7 @@ class FavoriteControllerIntegrationTest {
 
     @Test
     void remove_thenList_isEmpty() throws Exception {
-        String token = registerAndGetToken("favor5", "favor5@student.lautech.edu.ng");
+        String token = registerAndGetToken("favor5", "favor5@email.com");
         long productId = createProduct(token);
 
         mockMvc.perform(post("/api/favorites/{id}", productId)
@@ -170,7 +170,7 @@ class FavoriteControllerIntegrationTest {
 
     @Test
     void removeNonExistentFavorite_returnsNotFound() throws Exception {
-        String token = registerAndGetToken("favor6", "favor6@student.lautech.edu.ng");
+        String token = registerAndGetToken("favor6", "favor6@email.com");
 
         mockMvc.perform(delete("/api/favorites/1")
                         .header("Authorization", "Bearer " + token))
@@ -179,7 +179,7 @@ class FavoriteControllerIntegrationTest {
 
     @Test
     void browse_marksFavorited_onlyForTheAuthenticatedViewer() throws Exception {
-        String token = registerAndGetToken("favor7", "favor7@student.lautech.edu.ng");
+        String token = registerAndGetToken("favor7", "favor7@email.com");
         long productId = createProduct(token);
 
         mockMvc.perform(post("/api/favorites/{id}", productId)
