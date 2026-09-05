@@ -116,7 +116,7 @@ class ProductControllerIntegrationTest {
 
     @Test
     void createProduct_succeeds_andAttributesSellerFromToken_notFromRequestBody() throws Exception {
-        String token = registerAndGetToken("olamide", "olamide@student.lautech.edu.ng");
+        String token = registerAndGetToken("olamide", "olamide@email.com");
 
         mockMvc.perform(post("/api/products")
                         .header("Authorization", "Bearer " + token)
@@ -129,8 +129,8 @@ class ProductControllerIntegrationTest {
 
     @Test
     void updateProduct_isRejected_whenRequesterIsNotTheOwner() throws Exception {
-        String ownerToken = registerAndGetToken("owner", "owner@student.lautech.edu.ng");
-        String intruderToken = registerAndGetToken("intruder", "intruder@student.lautech.edu.ng");
+        String ownerToken = registerAndGetToken("owner", "owner@email.com");
+        String intruderToken = registerAndGetToken("intruder", "intruder@email.com");
 
         String createResponse = mockMvc.perform(post("/api/products")
                         .header("Authorization", "Bearer " + ownerToken)
@@ -165,8 +165,8 @@ class ProductControllerIntegrationTest {
 
     @Test
     void myListings_returnsOnlyTheAuthenticatedUsersOwnProducts() throws Exception {
-        String ownerToken = registerAndGetToken("seller1", "seller1@student.lautech.edu.ng");
-        registerAndGetToken("seller2", "seller2@student.lautech.edu.ng");
+        String ownerToken = registerAndGetToken("seller1", "seller1@email.com");
+        registerAndGetToken("seller2", "seller2@email.com");
 
         mockMvc.perform(post("/api/products")
                 .header("Authorization", "Bearer " + ownerToken)
@@ -182,7 +182,7 @@ class ProductControllerIntegrationTest {
 
     @Test
     void getAllProducts_combinesSearchCategoryAndPriceRange() throws Exception {
-        String token = registerAndGetToken("filter1", "filter1@student.lautech.edu.ng");
+        String token = registerAndGetToken("filter1", "filter1@email.com");
         createProduct(token, "MacBook Pro", "Apple laptop 16GB", "850000.00", "Electronics", "Brand New");
         createProduct(token, "Dell Laptop", "Dell XPS 13 laptop", "250000.00", "Electronics", "Neatly Used");
         createProduct(token, "HP Printer", "Office printer", "45000.00", "Electronics", "Neatly Used");
@@ -199,7 +199,7 @@ class ProductControllerIntegrationTest {
 
     @Test
     void getAllProducts_filtersByCondition_andSortsByPriceAscending() throws Exception {
-        String token = registerAndGetToken("filter2", "filter2@student.lautech.edu.ng");
+        String token = registerAndGetToken("filter2", "filter2@email.com");
         createProduct(token, "MacBook Pro", "Apple laptop", "850000.00", "Electronics", "Brand New");
         createProduct(token, "Dell Laptop", "Dell XPS", "250000.00", "Electronics", "Neatly Used");
         createProduct(token, "HP Printer", "Office printer", "45000.00", "Electronics", "Neatly Used");
@@ -234,7 +234,7 @@ class ProductControllerIntegrationTest {
         // field in a @RequestBody, so the boolean flags must be nullable
         // (Boolean) rather than primitives, or every listing created from the
         // app would 400.
-        String token = registerAndGetToken("lean1", "lean1@student.lautech.edu.ng");
+        String token = registerAndGetToken("lean1", "lean1@email.com");
 
         mockMvc.perform(post("/api/products")
                         .header("Authorization", "Bearer " + token)
@@ -276,7 +276,7 @@ class ProductControllerIntegrationTest {
 
     @Test
     void uploadImages_storesAllPhotos_andSetsFirstAsCover() throws Exception {
-        String token = registerAndGetToken("gallery1", "gallery1@student.lautech.edu.ng");
+        String token = registerAndGetToken("gallery1", "gallery1@email.com");
         long productId = createProductAndGetId(token, "Multi Photo Item");
 
         String body = mockMvc.perform(multipart("/api/products/{id}/images", productId)
@@ -302,7 +302,7 @@ class ProductControllerIntegrationTest {
 
     @Test
     void uploadImages_rejectsMoreThanFiveFiles() throws Exception {
-        String token = registerAndGetToken("gallery2", "gallery2@student.lautech.edu.ng");
+        String token = registerAndGetToken("gallery2", "gallery2@email.com");
         long productId = createProductAndGetId(token, "Too Many Photos");
 
         MockMultipartFile[] six = new MockMultipartFile[6];
@@ -319,8 +319,8 @@ class ProductControllerIntegrationTest {
 
     @Test
     void uploadImages_isForbidden_forNonOwner() throws Exception {
-        String ownerToken = registerAndGetToken("gallery3", "gallery3@student.lautech.edu.ng");
-        String otherToken = registerAndGetToken("gallery4", "gallery4@student.lautech.edu.ng");
+        String ownerToken = registerAndGetToken("gallery3", "gallery3@email.com");
+        String otherToken = registerAndGetToken("gallery4", "gallery4@email.com");
         long productId = createProductAndGetId(ownerToken, "Not Yours");
 
         mockMvc.perform(multipart("/api/products/{id}/images", productId)
