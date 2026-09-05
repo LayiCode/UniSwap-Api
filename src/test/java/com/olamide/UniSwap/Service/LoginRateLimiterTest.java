@@ -16,7 +16,7 @@ class LoginRateLimiterTest {
     @Test
     void cooldownBlocksImmediateResend() {
         LoginRateLimiter limiter = new LoginRateLimiter();
-        String key = "test@student.lautech.edu.ng";
+        String key = "test@email.com";
 
         limiter.recordCodeSent(key);
         long remaining = limiter.cooldownRemainingSeconds(key);
@@ -28,7 +28,7 @@ class LoginRateLimiterTest {
     @Test
     void cooldownExpiresAfterWindow() throws InterruptedException {
         LoginRateLimiter limiter = new LoginRateLimiter();
-        String key = "test@student.lautech.edu.ng";
+        String key = "test@email.com";
 
         limiter.recordCodeSent(key);
         Thread.sleep(1100);
