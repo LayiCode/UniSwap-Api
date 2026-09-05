@@ -24,7 +24,7 @@ public class User {
     private String username;
 
     @Column(unique = true, nullable = false)
-    private String email; // You can validate this to ensure it ends with @student.lautech.edu.ng later
+    private String email; // Normalized to lowercase and validated at signup
 
     @Column(nullable = false)
     private String password;
