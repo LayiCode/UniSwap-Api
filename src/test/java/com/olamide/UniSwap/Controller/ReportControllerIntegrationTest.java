@@ -114,7 +114,7 @@ class ReportControllerIntegrationTest {
 
     @Test
     void cannotReportOwnListing() throws Exception {
-        String sellerToken = registerAndGetToken("rep1a", "rep1a@student.lautech.edu.ng");
+        String sellerToken = registerAndGetToken("rep1a", "rep1a@email.com");
         long productId = createProduct(sellerToken, "My Own Book");
 
         mockMvc.perform(post("/api/reports")
@@ -126,8 +126,8 @@ class ReportControllerIntegrationTest {
 
     @Test
     void duplicateOpenReport_isConflict() throws Exception {
-        String sellerToken = registerAndGetToken("rep2a", "rep2a@student.lautech.edu.ng");
-        String reporterToken = registerAndGetToken("rep2b", "rep2b@student.lautech.edu.ng");
+        String sellerToken = registerAndGetToken("rep2a", "rep2a@email.com");
+        String reporterToken = registerAndGetToken("rep2b", "rep2b@email.com");
         long productId = createProduct(sellerToken, "Suspicious Watch");
 
         createReport(reporterToken, productId, "SPAM", "looks like spam");
@@ -140,8 +140,8 @@ class ReportControllerIntegrationTest {
 
     @Test
     void moderationQueue_isAdminOnly() throws Exception {
-        String sellerToken = registerAndGetToken("rep3a", "rep3a@student.lautech.edu.ng");
-        String reporterToken = registerAndGetToken("rep3b", "rep3b@student.lautech.edu.ng");
+        String sellerToken = registerAndGetToken("rep3a", "rep3a@email.com");
+        String reporterToken = registerAndGetToken("rep3b", "rep3b@email.com");
         long productId = createProduct(sellerToken, "To Report");
         long reportId = createReport(reporterToken, productId, "SCAM", "too good to be true");
 
@@ -156,7 +156,7 @@ class ReportControllerIntegrationTest {
                 .andExpect(status().isForbidden());
 
         // An admin can.
-        makeAdmin("rep3b@student.lautech.edu.ng");
+        makeAdmin("rep3b@email.com");
         mockMvc.perform(get("/api/reports")
                         .header("Authorization", "Bearer " + reporterToken))
                 .andExpect(status().isOk())
@@ -167,11 +167,11 @@ class ReportControllerIntegrationTest {
 
     @Test
     void resolve_keepsListing_browseable() throws Exception {
-        String sellerToken = registerAndGetToken("rep4a", "rep4a@student.lautech.edu.ng");
-        String reporterToken = registerAndGetToken("rep4b", "rep4b@student.lautech.edu.ng");
+        String sellerToken = registerAndGetToken("rep4a", "rep4a@email.com");
+        String reporterToken = registerAndGetToken("rep4b", "rep4b@email.com");
         long productId = createProduct(sellerToken, "Legit Item");
         long reportId = createReport(reporterToken, productId, "DUPLICATE", "false alarm");
-        makeAdmin("rep4b@student.lautech.edu.ng");
+        makeAdmin("rep4b@email.com");
 
         mockMvc.perform(patch("/api/reports/{id}", reportId)
                         .header("Authorization", "Bearer " + reporterToken)
@@ -188,12 +188,12 @@ class ReportControllerIntegrationTest {
 
     @Test
     void resolveWithRemove_hidesListing_fromEveryoneExceptOwnerAndAdmin() throws Exception {
-        String sellerToken = registerAndGetToken("rep5a", "rep5a@student.lautech.edu.ng");
-        String reporterToken = registerAndGetToken("rep5b", "rep5b@student.lautech.edu.ng");
-        String adminToken = registerAndGetToken("rep5c", "rep5c@student.lautech.edu.ng");
+        String sellerToken = registerAndGetToken("rep5a", "rep5a@email.com");
+        String reporterToken = registerAndGetToken("rep5b", "rep5b@email.com");
+        String adminToken = registerAndGetToken("rep5c", "rep5c@email.com");
         long productId = createProduct(sellerToken, "Scam Textbook");
         long reportId = createReport(reporterToken, productId, "SCAM", "fake seller");
-        makeAdmin("rep5c@student.lautech.edu.ng");
+        makeAdmin("rep5c@email.com");
 
         mockMvc.perform(patch("/api/reports/{id}", reportId)
                         .header("Authorization", "Bearer " + adminToken)
@@ -226,11 +226,11 @@ class ReportControllerIntegrationTest {
 
     @Test
     void dismiss_marksReportDismissed() throws Exception {
-        String sellerToken = registerAndGetToken("rep6a", "rep6a@student.lautech.edu.ng");
-        String reporterToken = registerAndGetToken("rep6b", "rep6b@student.lautech.edu.ng");
+        String sellerToken = registerAndGetToken("rep6a", "rep6a@email.com");
+        String reporterToken = registerAndGetToken("rep6b", "rep6b@email.com");
         long productId = createProduct(sellerToken, "Fine Item");
         long reportId = createReport(reporterToken, productId, "OTHER", "not really a problem");
-        makeAdmin("rep6b@student.lautech.edu.ng");
+        makeAdmin("rep6b@email.com");
 
         mockMvc.perform(patch("/api/reports/{id}", reportId)
                         .header("Authorization", "Bearer " + reporterToken)
@@ -247,11 +247,11 @@ class ReportControllerIntegrationTest {
 
     @Test
     void decidedReport_cannotBeDecidedAgain() throws Exception {
-        String sellerToken = registerAndGetToken("rep7a", "rep7a@student.lautech.edu.ng");
-        String reporterToken = registerAndGetToken("rep7b", "rep7b@student.lautech.edu.ng");
+        String sellerToken = registerAndGetToken("rep7a", "rep7a@email.com");
+        String reporterToken = registerAndGetToken("rep7b", "rep7b@email.com");
         long productId = createProduct(sellerToken, "Decided Item");
         long reportId = createReport(reporterToken, productId, "SPAM", "whatever");
-        makeAdmin("rep7b@student.lautech.edu.ng");
+        makeAdmin("rep7b@email.com");
 
         mockMvc.perform(patch("/api/reports/{id}", reportId)
                         .header("Authorization", "Bearer " + reporterToken)
@@ -268,8 +268,8 @@ class ReportControllerIntegrationTest {
 
     @Test
     void unknownStatusFilter_isBadRequest() throws Exception {
-        String token = registerAndGetToken("rep8a", "rep8a@student.lautech.edu.ng");
-        makeAdmin("rep8a@student.lautech.edu.ng");
+        String token = registerAndGetToken("rep8a", "rep8a@email.com");
+        makeAdmin("rep8a@email.com");
         mockMvc.perform(get("/api/reports?status=BOGUS")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isBadRequest());
