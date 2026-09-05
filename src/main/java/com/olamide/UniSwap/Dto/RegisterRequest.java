@@ -26,9 +26,10 @@ public class RegisterRequest {
 
     @NotBlank(message = "Email is required")
     @Email(message = "Email must be a valid email address")
-    // Uncomment to restrict signups to LAUTECH student emails only:
-    // @Pattern(regexp = "^[A-Za-z0-9._%+-]+@student\\.lautech\\.edu\\.ng$",
-    //         message = "Email must be a valid LAUTECH student email")
+    // Uncomment to restrict signups to a specific email domain, e.g. student
+    // emails, by adjusting the regexp below:
+    // @Pattern(regexp = "^[A-Za-z0-9._%+-]+@email\\.com$",
+    //         message = "Email must be a valid student email")
     private String email;
 
     @NotBlank(message = "Password is required")
