@@ -13,7 +13,7 @@ import static org.mockito.Mockito.when;
 class JwtServiceTest {
 
     private static final String SECRET = "a-test-secret-that-is-longer-than-thirty-two-bytes-000";
-    private static final String EMAIL = "olamide@student.lautech.edu.ng";
+    private static final String EMAIL = "olamide@email.com";
 
     private JwtService newService(long expirationMs) {
         return new JwtService(SECRET, expirationMs);
