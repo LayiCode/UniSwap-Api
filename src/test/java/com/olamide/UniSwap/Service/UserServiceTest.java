@@ -53,7 +53,7 @@ class UserServiceTest {
     void setUp() {
         registerRequest = RegisterRequest.builder()
                 .username("olamide")
-                .email("olamide@student.lautech.edu.ng")
+                .email("olamide@email.com")
                 .password("password123")
                 .phoneNumber("08012345678")
                 .build();
@@ -75,7 +75,7 @@ class UserServiceTest {
         RegisterResponse response = userService.register(registerRequest);
 
         assertThat(response.getUser().getUsername()).isEqualTo("olamide");
-        assertThat(response.getUser().getEmail()).isEqualTo("olamide@student.lautech.edu.ng");
+        assertThat(response.getUser().getEmail()).isEqualTo("olamide@email.com");
         assertThat(response.getUser().isEmailVerified()).isFalse();
         assertThat(response.getMessage()).isNotBlank();
         verify(userRepository).save(any(User.class));
@@ -83,7 +83,7 @@ class UserServiceTest {
         verify(passwordEncoder).encode("password123");
         // A signup code must be emailed so the account can be unlocked.
         verify(emailVerificationService).generateAndSendCode(
-                eq("olamide@student.lautech.edu.ng"), eq(VerificationPurpose.SIGNUP));
+                eq("olamide@email.com"), eq(VerificationPurpose.SIGNUP));
     }
 
     @Test
@@ -154,29 +154,29 @@ class UserServiceTest {
         User user = User.builder()
                 .id(1L)
                 .username("olamide")
-                .email("olamide@student.lautech.edu.ng")
+                .email("olamide@email.com")
                 .password("hashed-password")
                 .phoneNumber("08012345678")
                 .build();
 
-        when(userRepository.findByEmail("olamide@student.lautech.edu.ng")).thenReturn(Optional.of(user));
+        when(userRepository.findByEmail("olamide@email.com")).thenReturn(Optional.of(user));
         when(emailVerificationService.verifyCode(
-                "olamide@student.lautech.edu.ng", VerificationPurpose.SIGNUP, "123456")).thenReturn(true);
+                "olamide@email.com", VerificationPurpose.SIGNUP, "123456")).thenReturn(true);
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        User verified = userService.verifyEmail("olamide@student.lautech.edu.ng", "123456");
+        User verified = userService.verifyEmail("olamide@email.com", "123456");
 
         assertThat(verified.isEmailVerified()).isTrue();
     }
 
     @Test
     void verifyEmail_throwsBadRequest_whenCodeInvalid() {
-        when(userRepository.findByEmail("olamide@student.lautech.edu.ng"))
-                .thenReturn(Optional.of(User.builder().email("olamide@student.lautech.edu.ng").build()));
+        when(userRepository.findByEmail("olamide@email.com"))
+                .thenReturn(Optional.of(User.builder().email("olamide@email.com").build()));
         when(emailVerificationService.verifyCode(
-                "olamide@student.lautech.edu.ng", VerificationPurpose.SIGNUP, "000000")).thenReturn(false);
+                "olamide@email.com", VerificationPurpose.SIGNUP, "000000")).thenReturn(false);
 
-        assertThatThrownBy(() -> userService.verifyEmail("olamide@student.lautech.edu.ng", "000000"))
+        assertThatThrownBy(() -> userService.verifyEmail("olamide@email.com", "000000"))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("Invalid or expired verification code");
     }
@@ -207,15 +207,15 @@ class UserServiceTest {
     @Test
     void requestLoginCode_sendsCode_whenAccountExistsAndIsVerified() {
         User user = User.builder()
-                .email("olamide@student.lautech.edu.ng")
+                .email("olamide@email.com")
                 .emailVerified(true)
                 .build();
-        when(userRepository.findByEmail("olamide@student.lautech.edu.ng")).thenReturn(Optional.of(user));
+        when(userRepository.findByEmail("olamide@email.com")).thenReturn(Optional.of(user));
 
-        userService.requestLoginCode("olamide@student.lautech.edu.ng");
+        userService.requestLoginCode("olamide@email.com");
 
         verify(emailVerificationService).generateAndSendCode(
-                "olamide@student.lautech.edu.ng", VerificationPurpose.LOGIN);
+                "olamide@email.com", VerificationPurpose.LOGIN);
     }
 
     @Test
@@ -242,29 +242,29 @@ class UserServiceTest {
         User user = User.builder()
                 .id(1L)
                 .username("olamide")
-                .email("olamide@student.lautech.edu.ng")
+                .email("olamide@email.com")
                 .password("hashed-password")
                 .phoneNumber("08012345678")
                 .emailVerified(true)
                 .build();
 
-        when(userRepository.findByEmail("olamide@student.lautech.edu.ng")).thenReturn(Optional.of(user));
+        when(userRepository.findByEmail("olamide@email.com")).thenReturn(Optional.of(user));
         when(emailVerificationService.verifyCode(
-                "olamide@student.lautech.edu.ng", VerificationPurpose.LOGIN, "123456")).thenReturn(true);
+                "olamide@email.com", VerificationPurpose.LOGIN, "123456")).thenReturn(true);
         when(jwtService.generateToken(any())).thenReturn("fake-jwt-token");
 
-        AuthResponseDTO response = userService.loginWithCode("olamide@student.lautech.edu.ng", "123456");
+        AuthResponseDTO response = userService.loginWithCode("olamide@email.com", "123456");
 
         assertThat(response.getToken()).isEqualTo("fake-jwt-token");
-        assertThat(response.getUser().getEmail()).isEqualTo("olamide@student.lautech.edu.ng");
+        assertThat(response.getUser().getEmail()).isEqualTo("olamide@email.com");
     }
 
     @Test
     void loginWithCode_throwsUnauthorized_whenAccountNotVerified() {
-        User user = User.builder().email("olamide@student.lautech.edu.ng").build();
-        when(userRepository.findByEmail("olamide@student.lautech.edu.ng")).thenReturn(Optional.of(user));
+        User user = User.builder().email("olamide@email.com").build();
+        when(userRepository.findByEmail("olamide@email.com")).thenReturn(Optional.of(user));
 
-        assertThatThrownBy(() -> userService.loginWithCode("olamide@student.lautech.edu.ng", "123456"))
+        assertThatThrownBy(() -> userService.loginWithCode("olamide@email.com", "123456"))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("Email not verified");
 
@@ -274,14 +274,14 @@ class UserServiceTest {
     @Test
     void loginWithCode_throwsUnauthorized_whenCodeIsWrong() {
         User user = User.builder()
-                .email("olamide@student.lautech.edu.ng")
+                .email("olamide@email.com")
                 .emailVerified(true)
                 .build();
-        when(userRepository.findByEmail("olamide@student.lautech.edu.ng")).thenReturn(Optional.of(user));
+        when(userRepository.findByEmail("olamide@email.com")).thenReturn(Optional.of(user));
         when(emailVerificationService.verifyCode(
-                "olamide@student.lautech.edu.ng", VerificationPurpose.LOGIN, "000000")).thenReturn(false);
+                "olamide@email.com", VerificationPurpose.LOGIN, "000000")).thenReturn(false);
 
-        assertThatThrownBy(() -> userService.loginWithCode("olamide@student.lautech.edu.ng", "000000"))
+        assertThatThrownBy(() -> userService.loginWithCode("olamide@email.com", "000000"))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("Invalid email or code");
     }
@@ -300,7 +300,7 @@ class UserServiceTest {
         User user = User.builder()
                 .id(7L)
                 .username("olamide")
-                .email("olamide@student.lautech.edu.ng")
+                .email("olamide@email.com")
                 .displayName("Olamide")
                 .avatarUrl("https://x/y.png")
                 .bio("hi")
