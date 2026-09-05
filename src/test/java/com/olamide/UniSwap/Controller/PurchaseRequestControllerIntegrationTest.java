@@ -108,7 +108,7 @@ class PurchaseRequestControllerIntegrationTest {
 
     @Test
     void buyerCannotRequestOwnListing() throws Exception {
-        String sellerToken = registerAndGetToken("buyer1a", "buyer1a@student.lautech.edu.ng");
+        String sellerToken = registerAndGetToken("buyer1a", "buyer1a@email.com");
         long productId = createProduct(sellerToken, "Own MacBook");
 
         mockMvc.perform(post("/api/purchases")
@@ -120,8 +120,8 @@ class PurchaseRequestControllerIntegrationTest {
 
     @Test
     void requestSoldProduct_isConflict() throws Exception {
-        String sellerToken = registerAndGetToken("buyer1b", "buyer1b@student.lautech.edu.ng");
-        String buyerToken = registerAndGetToken("buyer1c", "buyer1c@student.lautech.edu.ng");
+        String sellerToken = registerAndGetToken("buyer1b", "buyer1b@email.com");
+        String buyerToken = registerAndGetToken("buyer1c", "buyer1c@email.com");
         long productId = createProduct(sellerToken, "Sold MacBook");
 
         mockMvc.perform(patch("/api/products/{id}/sold", productId)
@@ -137,8 +137,8 @@ class PurchaseRequestControllerIntegrationTest {
 
     @Test
     void create_showsUpInSentAndReceivedLists() throws Exception {
-        String sellerToken = registerAndGetToken("buyer2a", "buyer2a@student.lautech.edu.ng");
-        String buyerToken = registerAndGetToken("buyer2b", "buyer2b@student.lautech.edu.ng");
+        String sellerToken = registerAndGetToken("buyer2a", "buyer2a@email.com");
+        String buyerToken = registerAndGetToken("buyer2b", "buyer2b@email.com");
         long productId = createProduct(sellerToken, "Dell Laptop");
 
         createRequest(buyerToken, productId, "Can I pick it up tomorrow?");
@@ -164,8 +164,8 @@ class PurchaseRequestControllerIntegrationTest {
 
     @Test
     void duplicatePendingRequest_isConflict() throws Exception {
-        String sellerToken = registerAndGetToken("buyer3a", "buyer3a@student.lautech.edu.ng");
-        String buyerToken = registerAndGetToken("buyer3b", "buyer3b@student.lautech.edu.ng");
+        String sellerToken = registerAndGetToken("buyer3a", "buyer3a@email.com");
+        String buyerToken = registerAndGetToken("buyer3b", "buyer3b@email.com");
         long productId = createProduct(sellerToken, "HP Printer");
 
         createRequest(buyerToken, productId, "first");
@@ -178,9 +178,9 @@ class PurchaseRequestControllerIntegrationTest {
 
     @Test
     void nonSellerCannotAcceptAnotherSellersRequest() throws Exception {
-        String sellerToken = registerAndGetToken("buyer4a", "buyer4a@student.lautech.edu.ng");
-        String buyerToken = registerAndGetToken("buyer4b", "buyer4b@student.lautech.edu.ng");
-        String strangerToken = registerAndGetToken("buyer4c", "buyer4c@student.lautech.edu.ng");
+        String sellerToken = registerAndGetToken("buyer4a", "buyer4a@email.com");
+        String buyerToken = registerAndGetToken("buyer4b", "buyer4b@email.com");
+        String strangerToken = registerAndGetToken("buyer4c", "buyer4c@email.com");
         long productId = createProduct(sellerToken, "iPad");
         long requestId = createRequest(buyerToken, productId, null);
 
@@ -191,9 +191,9 @@ class PurchaseRequestControllerIntegrationTest {
 
     @Test
     void sellerAccept_marksProductSold_andDeclinesOtherPending() throws Exception {
-        String sellerToken = registerAndGetToken("buyer5a", "buyer5a@student.lautech.edu.ng");
-        String buyer1Token = registerAndGetToken("buyer5b", "buyer5b@student.lautech.edu.ng");
-        String buyer2Token = registerAndGetToken("buyer5c", "buyer5c@student.lautech.edu.ng");
+        String sellerToken = registerAndGetToken("buyer5a", "buyer5a@email.com");
+        String buyer1Token = registerAndGetToken("buyer5b", "buyer5b@email.com");
+        String buyer2Token = registerAndGetToken("buyer5c", "buyer5c@email.com");
         long productId = createProduct(sellerToken, "Samsung Phone");
         long r1 = createRequest(buyer1Token, productId, "me first");
         long r2 = createRequest(buyer2Token, productId, "me second");
@@ -227,8 +227,8 @@ class PurchaseRequestControllerIntegrationTest {
 
     @Test
     void sellerDecline_leavesListingAvailable() throws Exception {
-        String sellerToken = registerAndGetToken("buyer6a", "buyer6a@student.lautech.edu.ng");
-        String buyerToken = registerAndGetToken("buyer6b", "buyer6b@student.lautech.edu.ng");
+        String sellerToken = registerAndGetToken("buyer6a", "buyer6a@email.com");
+        String buyerToken = registerAndGetToken("buyer6b", "buyer6b@email.com");
         long productId = createProduct(sellerToken, "Keyboard");
         long requestId = createRequest(buyerToken, productId, null);
 
@@ -247,8 +247,8 @@ class PurchaseRequestControllerIntegrationTest {
 
     @Test
     void buyerCanCancelOwnPendingRequest() throws Exception {
-        String sellerToken = registerAndGetToken("buyer7a", "buyer7a@student.lautech.edu.ng");
-        String buyerToken = registerAndGetToken("buyer7b", "buyer7b@student.lautech.edu.ng");
+        String sellerToken = registerAndGetToken("buyer7a", "buyer7a@email.com");
+        String buyerToken = registerAndGetToken("buyer7b", "buyer7b@email.com");
         long productId = createProduct(sellerToken, "Headphones");
         long requestId = createRequest(buyerToken, productId, "changed my mind");
 
@@ -265,7 +265,7 @@ class PurchaseRequestControllerIntegrationTest {
 
     @Test
     void unknownScope_isBadRequest() throws Exception {
-        String token = registerAndGetToken("buyer8a", "buyer8a@student.lautech.edu.ng");
+        String token = registerAndGetToken("buyer8a", "buyer8a@email.com");
         mockMvc.perform(get("/api/purchases?scope=bogus")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isBadRequest());
@@ -273,8 +273,8 @@ class PurchaseRequestControllerIntegrationTest {
 
     @Test
     void detail_reportsPurchaseRequested_onlyForTheRequester() throws Exception {
-        String sellerToken = registerAndGetToken("buyer9a", "buyer9a@student.lautech.edu.ng");
-        String buyerToken = registerAndGetToken("buyer9b", "buyer9b@student.lautech.edu.ng");
+        String sellerToken = registerAndGetToken("buyer9a", "buyer9a@email.com");
+        String buyerToken = registerAndGetToken("buyer9b", "buyer9b@email.com");
         long productId = createProduct(sellerToken, "Monitor");
         createRequest(buyerToken, productId, null);
 
