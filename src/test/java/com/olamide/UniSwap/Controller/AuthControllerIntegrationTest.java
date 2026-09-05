@@ -59,7 +59,7 @@ class AuthControllerIntegrationTest {
     private RegisterRequest validRegisterRequest() {
         return RegisterRequest.builder()
                 .username("olamide")
-                .email("olamide@student.lautech.edu.ng")
+                .email("olamide@email.com")
                 .password("password123")
                 .phoneNumber("08012345678")
                 .build();
@@ -94,7 +94,7 @@ class AuthControllerIntegrationTest {
                         .content(objectMapper.writeValueAsString(validRegisterRequest())))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.user.username").value("olamide"))
-                .andExpect(jsonPath("$.user.email").value("olamide@student.lautech.edu.ng"))
+                .andExpect(jsonPath("$.user.email").value("olamide@email.com"))
                 // New accounts can't log in until the emailed code is confirmed.
                 .andExpect(jsonPath("$.user.emailVerified").value(false))
                 // No token is handed out at registration anymore — you log in
@@ -113,7 +113,7 @@ class AuthControllerIntegrationTest {
 
         RegisterRequest duplicate = RegisterRequest.builder()
                 .username("different-username")
-                .email("olamide@student.lautech.edu.ng") // same email
+                .email("olamide@email.com") // same email
                 .password("password456")
                 .phoneNumber("08099999999")
                 .build();
@@ -181,14 +181,14 @@ class AuthControllerIntegrationTest {
                         .content(objectMapper.writeValueAsString(validRegisterRequest())));
 
         String code = emailVerificationService.generateAndSendCode(
-                "olamide@student.lautech.edu.ng", VerificationPurpose.SIGNUP).code();
+                "olamide@email.com", VerificationPurpose.SIGNUP).code();
 
         mockMvc.perform(post("/api/auth/verify-email")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"olamide@student.lautech.edu.ng\",\"code\":\"" + code + "\"}"))
+                        .content("{\"email\":\"olamide@email.com\",\"code\":\"" + code + "\"}"))
                 .andExpect(status().isOk());
 
-        User user = userRepository.findByEmail("olamide@student.lautech.edu.ng").orElseThrow();
+        User user = userRepository.findByEmail("olamide@email.com").orElseThrow();
         org.assertj.core.api.Assertions.assertThat(user.isEmailVerified()).isTrue();
     }
 
@@ -200,7 +200,7 @@ class AuthControllerIntegrationTest {
 
         mockMvc.perform(post("/api/auth/verify-email")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"olamide@student.lautech.edu.ng\",\"code\":\"000000\"}"))
+                        .content("{\"email\":\"olamide@email.com\",\"code\":\"000000\"}"))
                 .andExpect(status().isBadRequest());
     }
 
@@ -257,7 +257,7 @@ class AuthControllerIntegrationTest {
 
         mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"olamide@student.lautech.edu.ng\",\"password\":\"password123\"}"))
+                        .content("{\"email\":\"olamide@email.com\",\"password\":\"password123\"}"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.message").value("Invalid email or password"));
     }
@@ -304,11 +304,11 @@ class AuthControllerIntegrationTest {
                 .content(objectMapper.writeValueAsString(validRegisterRequest())));
 
         String loginCode = emailVerificationService.generateAndSendCode(
-                "olamide@student.lautech.edu.ng", VerificationPurpose.LOGIN).code();
+                "olamide@email.com", VerificationPurpose.LOGIN).code();
 
         mockMvc.perform(post("/api/auth/login-code/verify")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"olamide@student.lautech.edu.ng\",\"code\":\"" + loginCode + "\"}"))
+                        .content("{\"email\":\"olamide@email.com\",\"code\":\"" + loginCode + "\"}"))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -465,7 +465,7 @@ class AuthControllerIntegrationTest {
 
         mockMvc.perform(post("/api/auth/resend-verification-code")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"olamide@student.lautech.edu.ng\"}"))
+                        .content("{\"email\":\"olamide@email.com\"}"))
                 .andExpect(status().isOk());
     }
 
